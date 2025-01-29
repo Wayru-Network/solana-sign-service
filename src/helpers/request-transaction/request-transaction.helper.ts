@@ -1,8 +1,11 @@
-import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward } from "@/interfaces/request-transaction/request-transaction.interface.js";
-import { getUserNFTTokenAccount } from "@/services/solana/solana.service.js";
+import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward } from "@/interfaces/request-transaction/request-transaction.interface";
+import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import bs58 from 'bs58';
+import nacl from 'tweetnacl';
+
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -125,3 +128,43 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
     }
     return accounts
 }
+
+export const verifyRewardsSignature = async (
+    message: string,
+    signature: string,
+    publicKey: string
+  ): Promise<{ isValid: boolean; error?: string }> => {
+    try {
+      // First verify the signature
+      const isSignatureValid = nacl.sign.detached.verify(
+        new TextEncoder().encode(message),
+        bs58.decode(signature),
+        bs58.decode(publicKey)
+      );
+      if (!isSignatureValid) {
+        return { isValid: false, error: 'Invalid signature' };
+      }
+      // Parse the message
+      const parsedMessage = JSON.parse(message);
+      const currentTime = Date.now();
+      // Verificamos la expiración
+      if (currentTime > parsedMessage.expiresAt) {
+        return { isValid: false, error: 'Signature has expired' };
+      }
+      // Verify that the timestamp is not in the future (with a margin of 5 minutes)
+      if (parsedMessage.timestamp > currentTime + (5 * 60 * 1000)) {
+        return { isValid: false, error: 'Invalid timestamp' };
+      }
+      // Verify that the nonce has not been used before
+      //const hasNonceBeenUsed = await checkNonceInDatabase(parsedMessage.nonce);
+      //if (hasNonceBeenUsed) {
+      //  return { isValid: false, error: 'Nonce has already been used' };
+      //}
+      // Save the nonce used
+      //await saveNonceToDatabase(parsedMessage.nonce, parsedMessage.expiresAt);
+      return { isValid: true };
+    } catch (error) {
+      console.error('Error verifying signature:', error);
+      return { isValid: false, error: 'Verification error' };
+    }
+  }

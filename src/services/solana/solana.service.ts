@@ -1,9 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
-import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers.js";
-import { ADMIN_PRIVATE_KEY, NODE_ENV } from "@/constants/solana/solana.constants.js";
-import { REWARD_SYSTEM_PROGRAM_ID } from "@/constants/solana/solana.constants.js";
-import { SOLANA_API_URL } from "@/constants/solana/solana.constants.js";
-import { RewardSystem } from "@/interfaces/reward-system-program/reward_system.js";
+import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers";
+import { ADMIN_PRIVATE_KEY, NODE_ENV } from "@/constants/solana/solana.constants";
+import { REWARD_SYSTEM_PROGRAM_ID } from "@/constants/solana/solana.constants";
+import { SOLANA_API_URL } from "@/constants/solana/solana.constants";
+import { RewardSystem } from "@/interfaces/reward-system-program/reward_system";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 

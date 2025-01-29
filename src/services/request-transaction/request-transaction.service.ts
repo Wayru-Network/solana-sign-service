@@ -1,13 +1,13 @@
-import { RequestTransactionResponse, RequestTransactionClaimReward, RequestTransactionInitializeNfnode, RequestTransactionUpdateHost } from "@/interfaces/request-transaction/request-transaction.interface.js";
+import { RequestTransactionResponse, RequestTransactionClaimReward, RequestTransactionInitializeNfnode, RequestTransactionUpdateHost } from "@/interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
-import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service.js";
-import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers.js";
-import { ADMIN_PRIVATE_KEY, ASSET_REWARD_ID } from "@/constants/solana/solana.constants.js";
+import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
+import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers";
+import { ADMIN_PRIVATE_KEY, ASSET_REWARD_ID } from "@/constants/solana/solana.constants";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { REQUEST_TRANSACTION_ERROR_CODES } from "@/errors/request-transaction/request-transaction.js";
-import { prepareAccountsToClaimReward, prepareParamsToClaimReward } from "@/helpers/request-transaction/request-transaction.helper.js";
+import { REQUEST_TRANSACTION_ERROR_CODES } from "@/errors/request-transaction/request-transaction";
+import { prepareAccountsToClaimReward } from "@/helpers/request-transaction/request-transaction.helper";
 
 /**
  * Request a transaction to initialize a NFNode
