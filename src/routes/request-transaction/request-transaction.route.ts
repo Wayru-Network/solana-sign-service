@@ -1,14 +1,22 @@
 import Router from 'koa-router';
-import { Context } from 'koa';
+import { Route } from '@/interfaces/api/api';
+import { CtxClaimRewards } from '@/interfaces/request-transaction/api';
+import { RequestTransactionController } from '@/controllers/request-transaction/request-transaction.controller';
+const router = new Router();
 
-const router = new Router({
-  prefix: '/api/request-transaction'
-});
+const routes: Route[] = [
+  {
+    method: 'post',
+    path: '/to-claim-rewards',
+    handler: async (ctx: CtxClaimRewards) => {
+      await RequestTransactionController.claimRewards(ctx);
+    }
+  },
+];
 
-router.get('/', async (ctx: Context) => {
-  ctx.body = {
-    message: 'Hello, World!'
-  };
+// Register all routes automatically
+routes.forEach(route => {
+  router[route.method](route.path, route.handler);
 });
 
 export default router;

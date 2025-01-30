@@ -3,8 +3,8 @@ import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { Transaction } from "@solana/web3.js";
+import { ENV } from "@config/env/env";
 
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
@@ -70,24 +70,24 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
     }
     const userNFTTokenAccount = await getUserNFTTokenAccount(nftMint, userWallet);
     const { tokenStorageAuthority, storageAccount, userTokenAccount, adminAccount, rewardEntry, nfnodeEntry } = params
-    let accounts: 
-    {
-        userAdmin: PublicKey,
-        user: PublicKey,
-        nftMintAddress: PublicKey,
-        rewardEntry: PublicKey,
-        nfnodeEntry: PublicKey,
-        tokenMint: PublicKey,
-        tokenStorageAuthority: PublicKey,
-        tokenStorageAccount: PublicKey,
-        userTokenAccount: PublicKey,
-        userNftTokenAccount?: PublicKey,
-        adminAccount: PublicKey,
-        tokenProgram2022: PublicKey,  // Añadido de nuevo
-        tokenProgram: PublicKey,
-        associatedTokenProgram: PublicKey,
-        systemProgram: PublicKey,
-    } | null = null
+    let accounts:
+        {
+            userAdmin: PublicKey,
+            user: PublicKey,
+            nftMintAddress: PublicKey,
+            rewardEntry: PublicKey,
+            nfnodeEntry: PublicKey,
+            tokenMint: PublicKey,
+            tokenStorageAuthority: PublicKey,
+            tokenStorageAccount: PublicKey,
+            userTokenAccount: PublicKey,
+            userNftTokenAccount?: PublicKey,
+            adminAccount: PublicKey,
+            tokenProgram2022: PublicKey,  // Añadido de nuevo
+            tokenProgram: PublicKey,
+            associatedTokenProgram: PublicKey,
+            systemProgram: PublicKey,
+        } | null = null
 
 
     if (claimerType === 'owner') {
@@ -129,42 +129,23 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
     return accounts
 }
 
-export const verifyRewardsSignature = async (
-    message: string,
-    signature: string,
-    publicKey: string
-  ): Promise<{ isValid: boolean; error?: string }> => {
+export const verifyRewardsSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
     try {
-      // First verify the signature
-      const isSignatureValid = nacl.sign.detached.verify(
-        new TextEncoder().encode(message),
-        bs58.decode(signature),
-        bs58.decode(publicKey)
-      );
-      if (!isSignatureValid) {
-        return { isValid: false, error: 'Invalid signature' };
-      }
-      // Parse the message
-      const parsedMessage = JSON.parse(message);
-      const currentTime = Date.now();
-      // Verificamos la expiración
-      if (currentTime > parsedMessage.expiresAt) {
-        return { isValid: false, error: 'Signature has expired' };
-      }
-      // Verify that the timestamp is not in the future (with a margin of 5 minutes)
-      if (parsedMessage.timestamp > currentTime + (5 * 60 * 1000)) {
-        return { isValid: false, error: 'Invalid timestamp' };
-      }
-      // Verify that the nonce has not been used before
-      //const hasNonceBeenUsed = await checkNonceInDatabase(parsedMessage.nonce);
-      //if (hasNonceBeenUsed) {
-      //  return { isValid: false, error: 'Nonce has already been used' };
-      //}
-      // Save the nonce used
-      //await saveNonceToDatabase(parsedMessage.nonce, parsedMessage.expiresAt);
-      return { isValid: true };
+        const transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
+
+        // Rebuild the message from all instructions
+        const message = transaction.instructions
+            .slice(1) // Ignore the first instruction (transfer)
+            .map(inst => inst.data.toString())
+            .join('');
+
+        const isValid = transaction.signatures.some(sig =>
+            sig.publicKey.toString() === ENV.DB_ADMIN_PUBLIC_KEY
+        );
+
+        return { isValid, message };
     } catch (error) {
-      console.error('Error verifying signature:', error);
-      return { isValid: false, error: 'Verification error' };
+        console.error('Error verifying the transaction:', error);
+        return { isValid: false, message: undefined };
     }
-  }
+}

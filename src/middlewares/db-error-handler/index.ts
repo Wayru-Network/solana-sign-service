@@ -7,7 +7,7 @@ export async function dbErrorHandler(ctx: Context, next: Next) {
     ctx.status = err.status || 500;
     ctx.body = {
       error: {
-        message: err.message || 'Error interno del servidor',
+        message: err.message || 'Internal server error',
         code: err.code
       }
     };

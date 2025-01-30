@@ -1,20 +1,19 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers";
-import { ADMIN_PRIVATE_KEY, NODE_ENV } from "@/constants/solana/solana.constants";
-import { REWARD_SYSTEM_PROGRAM_ID } from "@/constants/solana/solana.constants";
-import { SOLANA_API_URL } from "@/constants/solana/solana.constants";
-import { RewardSystem } from "@/interfaces/reward-system-program/reward_system";
+import { ENV } from "@config/env/env";
+import { SOLANA_API_URL } from "@constants/solana/solana.constants";
+import { RewardSystem } from "@interfaces/reward-system-program/reward_system";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 export const getRewardSystemProgram = async () => {
   try {
-    // get admin key
-    if (!ADMIN_PRIVATE_KEY) {
-      throw new Error("ADMIN_PRIVATE_KEY is not set");
+    // get admin keypair
+    if (!ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY) {
+      throw new Error("ADMIN_REWARD_SYSTEM_PRIVATE_KEY is not set");
     }
 
-    const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ADMIN_PRIVATE_KEY)));
+    const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY)));
     // prepare connection
     const connection = new anchor.web3.Connection(SOLANA_API_URL);
     const provider = new anchor.AnchorProvider(
@@ -22,9 +21,9 @@ export const getRewardSystemProgram = async () => {
       new anchor.Wallet(adminKeypair as unknown as anchor.web3.Keypair), // Type cast to anchor's Keypair
       { commitment: "confirmed" }
     );
-    const programId = new anchor.web3.PublicKey(REWARD_SYSTEM_PROGRAM_ID);
+    const programId = new anchor.web3.PublicKey(ENV.REWARD_SYSTEM_PROGRAM_ID);
     //only for devnet because it required fee
-    if (NODE_ENV === 'develop') {
+    if (ENV.NODE_ENV === 'develop') {
       const idl = await anchor.Program.fetchIdl(programId, provider);
       if (!idl) throw new Error("IDL not found");
     }

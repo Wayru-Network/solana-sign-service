@@ -2,7 +2,7 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { RewardSystem } from "../reward-system-program/reward_system.js";
 
-type claimerType = 'owner' | 'other'
+type claimerType = 'owner' | 'other' | 'manufacturer'
 
 
 /** Requests types */
@@ -18,6 +18,7 @@ export interface RequestTransactionClaimReward {
     rewardAmount: number;
     claimerType: claimerType
     walletAddress: string
+    rewards: [{id: number, amount: number}]
 }
 
 export interface PrepareParamsToClaimReward {
@@ -44,4 +45,14 @@ export interface RequestTransactionUpdateHost {
 
 
 /** Responses types */
-export type RequestTransactionResponse = Promise<{ serializedTx: string | null, error: boolean, code: string }>
+export type RequestTransactionResponse = Promise<{ serializedTx: string | null, error: boolean, code: string, claimRewardHistoryId?: number }>
+
+
+export interface SignRewardsMessage {
+    walletAddress: string;
+    totalAmount: number;
+    minerId: number;
+    rewardsId: number[];
+    type: claimerType
+    solanaAssetId: string;
+}
