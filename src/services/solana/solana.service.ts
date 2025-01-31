@@ -53,7 +53,6 @@ export const getUserNFTTokenAccount = async (
           TOKEN_2022_PROGRAM_ID   // programId
       );
 
-      console.log("NFT Token Account:", userNFTTokenAccount.toString());
       return userNFTTokenAccount;
   } catch (error) {
       console.error("Error getting NFT token account:", error);

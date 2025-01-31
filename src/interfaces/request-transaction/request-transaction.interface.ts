@@ -5,22 +5,6 @@ import { RewardSystem } from "../reward-system-program/reward_system.js";
 type claimerType = 'owner' | 'other' | 'manufacturer'
 
 
-/** Requests types */
-export interface RequestTransactionInitializeNfnode {
-    walletOwner: string;
-    hostAddress: string;
-    manufacturerAddress: string;
-    solanaAssetId: string;
-}
-
-export interface RequestTransactionClaimReward {
-    solanaAssetId: string;
-    rewardAmount: number;
-    claimerType: claimerType
-    walletAddress: string
-    rewards: [{id: number, amount: number}]
-}
-
 export interface PrepareParamsToClaimReward {
     program: Program<RewardSystem>
     mint: PublicKey
@@ -54,5 +38,12 @@ export interface SignRewardsMessage {
     minerId: number;
     rewardsId: number[];
     type: claimerType
+    solanaAssetId: string;
+}
+
+export interface InitializeNfnodeMessage {
+    walletOwnerAddress: string;
+    hostAddress: string;
+    manufacturerAddress: string;
     solanaAssetId: string;
 }

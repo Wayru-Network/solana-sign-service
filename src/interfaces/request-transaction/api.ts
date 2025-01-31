@@ -1,7 +1,7 @@
 import { CtxBase } from "../api/api";
 
-interface ClaimRewardsBody {
+interface SignatureInsideBody {
     signature: string;
 }
 
-export interface CtxClaimRewards extends CtxBase<ClaimRewardsBody> {}
+export interface CtxSignatureInside extends CtxBase<SignatureInsideBody> {}

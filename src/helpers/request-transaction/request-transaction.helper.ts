@@ -1,11 +1,11 @@
-import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward } from "@/interfaces/request-transaction/request-transaction.interface";
+import { InitializeNfnodeMessage, PrepareAccountsToClaimReward, PrepareParamsToClaimReward, SignRewardsMessage } from "@/interfaces/request-transaction/request-transaction.interface";
 import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-
+import { rewardClaimSchema, initializeNfnodeSchema } from "@validations/request-transaction/request-transaction.validation";
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -13,8 +13,6 @@ export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nf
             [Buffer.from("token_storage")],
             program.programId
         );
-        console.log("\n=== PDAs and Accounts ===");
-        console.log("Token Storage Authority:", tokenStorageAuthority.toString());
 
         // Get storage account
         const storageAccount = await getAssociatedTokenAddress(
@@ -23,7 +21,6 @@ export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nf
             true,
             TOKEN_PROGRAM_ID
         );
-        console.log("Storage Account:", storageAccount.toString());
 
         // Get user's token account
         const userTokenAccount = await getAssociatedTokenAddress(
@@ -149,3 +146,23 @@ export const verifyRewardsSignature = async (serializedTransaction: string): Pro
         return { isValid: false, message: undefined };
     }
 }
+
+export const processRewardClaimMessage = async (message: string) => {
+    try {
+        const data = JSON.parse(message) as SignRewardsMessage;
+        await rewardClaimSchema.validate(data);
+        return data;
+    } catch (error) {
+        return null;
+    }
+};
+
+export const processInitializeNfnodeMessage = async (message: string) => {
+    try {
+        const data = JSON.parse(message) as InitializeNfnodeMessage;
+        await initializeNfnodeSchema.validate(data);
+        return data;
+    } catch (error) {
+        return null;
+    }
+};

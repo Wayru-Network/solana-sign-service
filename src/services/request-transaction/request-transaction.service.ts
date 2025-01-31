@@ -1,28 +1,47 @@
-import { RequestTransactionResponse, RequestTransactionClaimReward, RequestTransactionInitializeNfnode, RequestTransactionUpdateHost, SignRewardsMessage } from "@/interfaces/request-transaction/request-transaction.interface";
+import { RequestTransactionResponse, RequestTransactionUpdateHost } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
-import { getKeyPairFromUnit8Array } from "@/helpers/solana/solana.helpers";
+import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { REQUEST_TRANSACTION_ERROR_CODES } from "@/errors/request-transaction/request-transaction";
-import { prepareAccountsToClaimReward, verifyRewardsSignature } from "@/helpers/request-transaction/request-transaction.helper";
+import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
+import { prepareAccountsToClaimReward, processInitializeNfnodeMessage, processRewardClaimMessage, verifyRewardsSignature } from "@helpers/request-transaction/request-transaction.helper";
 import { updateClaimRewardHistoryStatus, verifySignatureStatus } from "./request-transactions-queries";
-import { rewardClaimSchema } from "@validations/request-transaction/request-transaction.validation";
 import { ENV } from "@config/env/env";
 
 /**
  * Request a transaction to initialize a NFNode
- * @param {RequestTransactionInitializeNfnode} params - The parameters for the transaction
+ * @param {string} signature - The signature of the initialize nfnode message
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
  */
-export const requestTransactionToInitializeNfnode = async ({ walletOwner, hostAddress, manufacturerAddress, solanaAssetId }: RequestTransactionInitializeNfnode): RequestTransactionResponse => {
+export const requestTransactionToInitializeNfnode = async (signature: string): RequestTransactionResponse => {
     try {
+        // verify the signature
+        const { isValid, message } = await verifyRewardsSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+
+        const data = await processInitializeNfnodeMessage(message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId } = data;
+
         // prepare transaction parameters
         const nonce = new BN(Date.now());
         const program = await getRewardSystemProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
-        const user = new PublicKey(walletOwner); // owner of the NFT
+        const user = new PublicKey(walletOwnerAddress); // owner of the NFT
         const host = new PublicKey(hostAddress); // host of the NFT
         const manufacturer = new PublicKey(manufacturerAddress); // manufacturer of the NFT
         const nftMintAddress = new PublicKey(solanaAssetId); // mint address of the NFT
@@ -74,7 +93,7 @@ export const requestTransactionToInitializeNfnode = async ({ walletOwner, hostAd
 
 /**
  * Request a transaction to claim reward
- * @param {RequestTransactionClaimReward} params - The parameters for the transaction
+ * @param {string} signature - The signature of the reward claim message
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
  */
 export const requestTransactionToClaimReward = async (signature: string): RequestTransactionResponse => {
@@ -197,13 +216,3 @@ export const requestTransactionToUpdateHost = async (params: RequestTransactionU
         }
     }
 }
-
-const processRewardClaimMessage = async (message: string) => {
-    try {
-        const data = JSON.parse(message) as SignRewardsMessage;
-        await rewardClaimSchema.validate(data);
-        return data;
-    } catch (error) {
-        return null;
-    }
-};
