@@ -1,9 +1,9 @@
 import pool from "@/config/db";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { SignRewardsMessage } from "@/interfaces/request-transaction/request-transaction.interface";
+import { ClaimerType } from "@/interfaces/request-transaction/request-transaction.interface";
 import { ClaimRewardHistory, ClaimRewardHistoryStatus } from "@/interfaces/claim-reward-histories/claim-reward-histories";
 
-export const verifySignatureStatus = async (signature: string, rewardsId: number[], minerId: number, claimerType: SignRewardsMessage['type']) => {
+export const verifySignatureStatus = async (signature: string, rewardsId: number[], minerId: number, claimerType: ClaimerType) => {
 
     // validations for signature and rewards id:
     // 1: signature is equal to the signature in the database

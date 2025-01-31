@@ -2,7 +2,7 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { RewardSystem } from "../reward-system-program/reward_system.js";
 
-type claimerType = 'owner' | 'other' | 'manufacturer'
+export type ClaimerType = 'owner' | 'other' | 'manufacturer'
 
 
 export interface PrepareParamsToClaimReward {
@@ -17,7 +17,7 @@ export interface PrepareAccountsToClaimReward {
     mint: PublicKey
     userWallet: PublicKey
     nftMint: PublicKey
-    claimerType: claimerType
+    claimerType: ClaimerType
     adminKeypair: Keypair
 }
 
@@ -29,15 +29,19 @@ export interface RequestTransactionUpdateHost {
 
 
 /** Responses types */
-export type RequestTransactionResponse = Promise<{ serializedTx: string | null, error: boolean, code: string, claimRewardHistoryId?: number }>
+export type RequestTransactionResponse = Promise<{ serializedTx: string | null, error: boolean, code: string }>
 
 
-export interface SignRewardsMessage {
+
+/** Message types */
+export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode'
+
+export interface ClaimRewardsMessage {
     walletAddress: string;
     totalAmount: number;
     minerId: number;
     rewardsId: number[];
-    type: claimerType
+    type: ClaimerType
     solanaAssetId: string;
 }
 
@@ -46,4 +50,17 @@ export interface InitializeNfnodeMessage {
     hostAddress: string;
     manufacturerAddress: string;
     solanaAssetId: string;
+}
+
+export interface UpdateHostMessage {
+    walletOwnerAddress: string;
+    hostAddress: string;
+    solanaAssetId: string;
+}
+
+// Mapping between message types and their payloads
+export type PayloadProccessMessageByType = {
+    'claim-rewards': ClaimRewardsMessage;
+    'initialize-nfnode': InitializeNfnodeMessage;
+    'add-host-to-nfnode': UpdateHostMessage;
 }

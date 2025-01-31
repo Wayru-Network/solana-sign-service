@@ -1,11 +1,11 @@
-import { InitializeNfnodeMessage, PrepareAccountsToClaimReward, PrepareParamsToClaimReward, SignRewardsMessage } from "@/interfaces/request-transaction/request-transaction.interface";
+import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProccessMessageByType, MessageType } from "@/interfaces/request-transaction/request-transaction.interface";
 import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-import { rewardClaimSchema, initializeNfnodeSchema } from "@validations/request-transaction/request-transaction.validation";
+import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema } from "@validations/request-transaction/request-transaction.validation";
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -147,22 +147,26 @@ export const verifyRewardsSignature = async (serializedTransaction: string): Pro
     }
 }
 
-export const processRewardClaimMessage = async (message: string) => {
+export const proccessMessageData = async <T extends MessageType>(type: T, message: string) => {
     try {
-        const data = JSON.parse(message) as SignRewardsMessage;
-        await rewardClaimSchema.validate(data);
-        return data;
-    } catch (error) {
-        return null;
-    }
-};
+        const data = JSON.parse(message) as PayloadProccessMessageByType[T];
 
-export const processInitializeNfnodeMessage = async (message: string) => {
-    try {
-        const data = JSON.parse(message) as InitializeNfnodeMessage;
-        await initializeNfnodeSchema.validate(data);
-        return data;
+        // validate schemas
+        switch (type) {
+            case 'claim-rewards':
+                await rewardClaimSchema.validate(data);
+                return data;
+            case 'initialize-nfnode':
+                await initializeNfnodeSchema.validate(data);
+                return data;
+            case 'add-host-to-nfnode':
+                await updateHostSchema.validate(data);
+                return data;
+            default:
+                return null;
+        }
     } catch (error) {
+        console.error('Error processing message data:', error);
         return null;
     }
-};
+}

@@ -6,9 +6,10 @@ import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { prepareAccountsToClaimReward, processInitializeNfnodeMessage, processRewardClaimMessage, verifyRewardsSignature } from "@helpers/request-transaction/request-transaction.helper";
+import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { updateClaimRewardHistoryStatus, verifySignatureStatus } from "./request-transactions-queries";
 import { ENV } from "@config/env/env";
+import { SOLANA_API_URL } from "@constants/solana/solana.constants";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -27,7 +28,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             };
         }
 
-        const data = await processInitializeNfnodeMessage(message);
+        const data = await proccessMessageData('initialize-nfnode', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -106,18 +107,18 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE
             };
         };
-        const data = await processRewardClaimMessage(message);
+        const data = await proccessMessageData('claim-rewards', message);
         if (!data) {
             return {
                 serializedTx: null,
                 error: true,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE
             };
-        } 
+        }
         const { walletAddress, totalAmount, minerId, rewardsId, type: claimerType, solanaAssetId } = data;
 
         // first verify the signature status
-        const {isValidStatus, code} = await verifySignatureStatus(signature, rewardsId, minerId,  claimerType);
+        const { isValidStatus, code } = await verifySignatureStatus(signature, rewardsId, minerId, claimerType);
         if (!isValidStatus) {
             return {
                 serializedTx: null,
@@ -200,14 +201,70 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
     }
 }
 
-export const requestTransactionToUpdateHost = async (params: RequestTransactionUpdateHost): RequestTransactionResponse => {
+/**
+ * Request a transaction to update the host of a NFNode
+ * @param {string} signature - The signature of the update host message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToUpdateHost = async (signature: string): RequestTransactionResponse => {
     try {
-        return {
-            serializedTx: null,
-            error: false,
-            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_SUCCESS_CODE
+        // verify the signature
+        const { isValid, message } = await verifyRewardsSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_SIGNATURE_ERROR_CODE
+            };
         }
+        const data = await proccessMessageData('add-host-to-nfnode', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletOwnerAddress, hostAddress, solanaAssetId } = data;
 
+        // prepare transaction parameters 
+        const connection = await getSolanaConnection();
+        const program = await getRewardSystemProgram()
+        const ownerAddress = new PublicKey(walletOwnerAddress)
+        const nftMint = new PublicKey(solanaAssetId)
+        const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+        const hostWalletAddress = new PublicKey(hostAddress)
+        const nonce = new BN(Date.now())
+        const userNFTTokenAccount = await getUserNFTTokenAccount(nftMint, ownerAddress);
+        // create the tx for the user
+        const ix = await program.methods
+            .updateNfnode(nonce)
+            .accounts({
+                userAdmin: adminKeypair.publicKey,
+                user: ownerAddress,
+                host: hostWalletAddress,
+                nftMintAddress: nftMint,
+                userNftTokenAccount: userNFTTokenAccount,
+                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+            })
+            .instruction()
+        let tx = new anchor.web3.Transaction();
+        tx.add(ix)
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = ownerAddress;
+        tx.partialSign(adminKeypair);
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        return {
+            serializedTx: serializedTx.toString("base64"),
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
     } catch (error) {
         return {
             serializedTx: null,

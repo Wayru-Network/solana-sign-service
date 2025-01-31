@@ -18,6 +18,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.initializeNfnode(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/to-add-host-to-nfnode',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.addHostToNfnode(ctx);
+    }
   }
 ];
 

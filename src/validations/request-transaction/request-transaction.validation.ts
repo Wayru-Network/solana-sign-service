@@ -26,3 +26,9 @@ export const initializeNfnodeSchema = yup.object().shape({
   manufacturerAddress: yup.string().required('Manufacturer address is required'),
   solanaAssetId: yup.string().required('Solana asset ID is required')
 });
+
+export const updateHostSchema = yup.object().shape({
+  walletOwnerAddress: yup.string().required('Wallet owner is required'),
+  hostAddress: yup.string().required('Host address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required')
+});
