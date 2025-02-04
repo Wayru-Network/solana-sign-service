@@ -1,15 +1,15 @@
-import { RequestTransactionResponse, RequestTransactionUpdateHost } from "@interfaces/request-transaction/request-transaction.interface";
+import { NFNodeType, RequestTransactionResponse, RequestTransactionUpdateHost } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
-import { PublicKey } from "@solana/web3.js";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { updateClaimRewardHistoryStatus, verifySignatureStatus } from "./request-transactions-queries";
 import { ENV } from "@config/env/env";
-import { SOLANA_API_URL } from "@constants/solana/solana.constants";
+import { log } from "console";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -36,7 +36,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId } = data;
+        const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId, nfnodeType } = data;
 
         // prepare transaction parameters
         const nonce = new BN(Date.now());
@@ -47,19 +47,50 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         const manufacturer = new PublicKey(manufacturerAddress); // manufacturer of the NFT
         const nftMintAddress = new PublicKey(solanaAssetId); // mint address of the NFT
         const userNFTTokenAccount = await getUserNFTTokenAccount(nftMintAddress, user);
+        const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("nfnode_entry"), nftMintAddress.toBuffer()],
+            program.programId
+        );
+        const [adminAccountPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("admin_account")],
+            program.programId
+        );
+        const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+            [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
+            program.programId
+        );
+        const [tokenStorageAccount] = PublicKey.findProgramAddressSync(
+            [Buffer.from("token_storage_account"), nftMintAddress.toBuffer()],
+            program.programId
+        );
+        const userTokenAccount = await getAssociatedTokenAddress(
+            new PublicKey(ENV.REWARD_TOKEN_MINT),
+            user
+        );
+
+        const accounts = {
+            userAdmin: adminKeypair.publicKey,
+            user: user,
+            nftMintAddress: nftMintAddress,
+            userNftTokenAccount: userNFTTokenAccount,
+            host: host,
+            manufacturer: manufacturer,
+            tokenMint: ENV.REWARD_TOKEN_MINT,
+            nfnodeEntry: nfnodeEntryPDA,
+            adminAccount: adminAccountPDA,
+            tokenStorageAuthority,
+            tokenStorageAccount,
+            userTokenAccount,
+            tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+        } as const;
 
         // create a transaction
         const tx = await program.methods
-            .initializeNfnode(nonce)
-            .accounts({
-                userAdmin: adminKeypair.publicKey,
-                user,
-                nftMintAddress,
-                host,
-                manufacturer,
-                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
-                userNftTokenAccount: userNFTTokenAccount,
-            })
+            .initializeNfnode(nonce, nfnodeType as Record<NFNodeType, never>)
+            .accounts(accounts)
             .transaction()
 
         // get the latest blockhash
@@ -131,7 +162,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const program = await getRewardSystemProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletAddress);
-        const mint = new PublicKey(ENV.ASSET_REWARD_ID)
+        const mint = new PublicKey(ENV.REWARD_TOKEN_MINT)
         const nftMint = new PublicKey(solanaAssetId)
         const amountToClaim = new BN(convertToTokenAmount(totalAmount));
         const nonce = new BN(Date.now());
@@ -270,6 +301,67 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
             serializedTx: null,
             error: true,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_HOST_ERROR_CODE
+        }
+    }
+}
+
+
+/**
+ * Request a transaction to withdraw tokens
+ * @param signature - The signature of the withdraw tokens message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionWidthDrawTokens = async (signature: string): Promise<RequestTransactionResponse> => {
+    try {
+        const { isValid, message } = await verifyRewardsSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        // decode the message
+        const data = await proccessMessageData('withdraw-tokens', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, solanaAssetId, userNFTTokenAccount } = data;
+        const program = await getRewardSystemProgram();
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(solanaAssetId);
+        const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+        const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
+      
+        const _signature = await program.methods
+            .withdrawTokens()
+            .accounts({
+                user: user,
+                tokenMint: ENV.REWARD_TOKEN_MINT,
+                nftMintAddress: nftMint,
+                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                userNftTokenAccount: _userNFTTokenAccount
+            })
+            .signers([adminKeypair])
+            .rpc();
+
+
+            return {
+                serializedTx: null,
+                error: false,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+            }
+
+    } catch (error) {
+        console.error(`Error requesting transaction to withdraw tokens:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_ERROR_CODE
         }
     }
 }

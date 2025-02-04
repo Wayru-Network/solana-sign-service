@@ -1,3 +1,4 @@
+import { InitializeNfnodeMessage, NFNodeType } from '@interfaces/request-transaction/request-transaction.interface';
 import * as yup from 'yup';
 
 export const signatureInsideSchema = yup.object({
@@ -6,7 +7,7 @@ export const signatureInsideSchema = yup.object({
     .trim()
     .strict()
     .typeError('The signature must be a string')
-    .test('not-empty', 'The signature cannot be empty', 
+    .test('not-empty', 'The signature cannot be empty',
       value => value?.trim().length > 0
     )
 });
@@ -24,11 +25,42 @@ export const initializeNfnodeSchema = yup.object().shape({
   walletOwnerAddress: yup.string().required('Wallet owner is required'),
   hostAddress: yup.string().required('Host address is required'),
   manufacturerAddress: yup.string().required('Manufacturer address is required'),
-  solanaAssetId: yup.string().required('Solana asset ID is required')
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nfnodeType: yup.object().test(
+    'is-valid-nfnode-type',
+    'Invalid NFNode type format',
+    (value: Record<string, unknown>) => {
+
+      const validTypes: Array<NFNodeType> = ['don', 'byod', 'wayruHotspot'];
+      const keys = Object.keys(value || {});
+
+      if (keys.length !== 1) {
+        console.log('Failed: incorrect number of keys');
+        return false;
+      }
+
+      const type = keys[0] as NFNodeType;
+      if (!validTypes.includes(type)) {
+        return false;
+      }
+
+      const isValidObject = typeof value[type] === 'object' &&
+        value[type] !== null &&
+        Object.keys(value[type] as object).length === 0;
+
+      return isValidObject;
+    }
+  ).required('NFNode type is required')
 });
 
 export const updateHostSchema = yup.object().shape({
   walletOwnerAddress: yup.string().required('Wallet owner is required'),
   hostAddress: yup.string().required('Host address is required'),
   solanaAssetId: yup.string().required('Solana asset ID is required')
+});
+
+export const withdrawTokensSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  userNFTTokenAccount: yup.string().required('User NFT token account is required')
 });
