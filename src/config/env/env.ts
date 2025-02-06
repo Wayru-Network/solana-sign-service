@@ -15,5 +15,5 @@ export const ENV = {
     SOLANA_API_KEY: process.env.SOLANA_API_KEY,
     SOLANA_API_URL: process.env.SOLANA_API_URL,
     REWARD_TOKEN_MINT: process.env.REWARD_TOKEN_MINT || '5AZRsHiVCQPU8uDh9aKkgmgXz52VmqnYwzhYB6eFum5',
-    REWARD_SYSTEM_PROGRAM_ID: process.env.REWARD_SYSTEM_PROGRAM_ID || '49YD9iaXY39zY8tycUg1vJvk6b4cDoVJNrbsmMkk3ihF'
+    REWARD_SYSTEM_PROGRAM_ID: process.env.REWARD_SYSTEM_PROGRAM_ID || '98MWRmimeQobxgPx1atu3Dg9WGUeMP2zxjzoyuaPAZUu'
   };
