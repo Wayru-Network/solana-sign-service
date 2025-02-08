@@ -1,0 +1,59 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solana-sign-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: solana-sign-service
+  template:
+    metadata:
+      labels:
+        app: solana-sign-service
+    spec:
+      containers:
+      - name: solana-sign-service
+        image: ${CONTAINER_REGISTRY}/solana-sign-service:${IMAGE_TAG}
+        env:
+            - name: DATABASE_HOST
+              value: localhost
+            - name: DATABASE_NAME
+              value: product_local
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_USERNAME
+              value: adminDB
+            - name: NDODE_ENV
+              value: production
+            - name: PORT
+              value: "80"
+            - name: DB_ADMIN_PUBLIC_KEY
+              value: 8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD
+            - name: SOLANA_API_URL
+              value: https://api.devnet.solana.comom
+            - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: signature-service-secrets
+                  key: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: signature-service-secrets
+                  key: DATABASE_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: signature-service-secrets
+                  key: JWT_SECRET
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

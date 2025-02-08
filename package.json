@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "NODE_ENV=development nodemon",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "start": "node dist/server.js"
   },
   "keywords": [],
@@ -40,6 +40,7 @@
     "@types/node": "^20.x.x",
     "@types/pg": "^8.11.11",
     "nodemon": "^3.1.9",
+    "tsc-alias": "^1.8.10",
     "ts-node": "^10.x.x",
     "tsconfig-paths": "^4.x.x",
     "typescript": "^5.x.x"

@@ -1,0 +1,24 @@
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solana-sign-service-ingress
+  annotations:
+    kubernetes.io/ingress.class: "addon-http-application-routing"
+    cert-manager.io/cluster-issuer: "letsencrypt"
+spec:
+  tls:
+  - hosts:
+    - ${DOMAIN_NAME}
+    secretName: solana-sign-service-tls
+  rules:
+  - host: ${DOMAIN_NAME}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: solana-sign-service
+            port:
+              number: 80
