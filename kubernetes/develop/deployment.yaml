@@ -18,9 +18,9 @@ spec:
         image: ${CONTAINER_REGISTRY}/solana-sign-service:${IMAGE_TAG}
         env:
             - name: DATABASE_HOST
-              value: localhost
+              value: "172.168.206.66"
             - name: DATABASE_NAME
-              value: product_local
+              value: dashboard_prod_test
             - name: DATABASE_PORT
               value: "5432"
             - name: DATABASE_USERNAME
