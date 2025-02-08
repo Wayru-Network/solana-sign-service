@@ -1,24 +1,23 @@
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: solana-sign-service-ingress
   annotations:
-    kubernetes.io/ingress.class: "addon-http-application-routing"
-    cert-manager.io/cluster-issuer: "letsencrypt"
+    nginx.ingress.kubernetes.io/rewrite-target: /  
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  
 spec:
   tls:
   - hosts:
-    - ${DOMAIN_NAME}
-    secretName: solana-sign-service-tls
+    - secrets.dev.wayru.tech  
+    secretName: solana-sign-service-tls  
   rules:
-  - host: ${DOMAIN_NAME}
+  - host: secrets.dev.wayru.tech  
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: solana-sign-service
+            name: solana-sign-service  
             port:
-              number: 80
+              number: 80  
