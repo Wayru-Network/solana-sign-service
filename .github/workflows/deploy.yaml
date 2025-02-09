@@ -61,19 +61,19 @@ jobs:
         if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
           # Replace placeholders in deployment files
           sed -i "s|\${CONTAINER_REGISTRY}/solana-sign-service:\${IMAGE_TAG}|$CONTAINER_IMAGE|g" kubernetes/prod/deployment.yaml
-          sed -i "s|\${DOMAIN_NAME}|$DOMAIN_NAME|g" kubernetes/prod/ingress.yaml
+          # sed -i "s|\${DOMAIN_NAME}|$DOMAIN_NAME|g" kubernetes/prod/ingress.yaml
         
           # Apply Kubernetes configurations
           kubectl apply -f kubernetes/prod/deployment.yaml
           kubectl apply -f kubernetes/prod/service.yaml
-          kubectl apply -f kubernetes/prod/ingress.yaml  
+          # kubectl apply -f kubernetes/prod/ingress.yaml  
         else
           # Replace placeholders in deployment files
           sed -i "s|\${CONTAINER_REGISTRY}/solana-sign-service:\${IMAGE_TAG}|$CONTAINER_IMAGE|g" kubernetes/develop/deployment.yaml
-          sed -i "s|\${DOMAIN_NAME}|$DOMAIN_NAME|g" kubernetes/develop/ingress.yaml
+          # sed -i "s|\${DOMAIN_NAME}|$DOMAIN_NAME|g" kubernetes/develop/ingress.yaml
         
           # Apply Kubernetes configurations
           kubectl apply -f kubernetes/develop/deployment.yaml
           kubectl apply -f kubernetes/develop/service.yaml
-          kubectl apply -f kubernetes/develop/ingress.yaml
+          # kubectl apply -f kubernetes/develop/ingress.yaml
         fi

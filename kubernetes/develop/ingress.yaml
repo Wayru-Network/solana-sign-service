@@ -4,12 +4,8 @@ metadata:
   name: solana-sign-service-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /  
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"  
+    kubernetes.io/ingress.class: "nginx"  
 spec:
-  tls:
-  - hosts:
-    - secrets.dev.wayru.tech  
-    secretName: solana-sign-service-tls  
   rules:
   - host: secrets.dev.wayru.tech  
     http:
