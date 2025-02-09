@@ -1,19 +1,25 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: solana-sign-service-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /  
-    kubernetes.io/ingress.class: "nginx"  
+    kubernetes.azure.com/tls-cert-keyvault-uri: >-
+      https://secrets-keys-store.vault.azure.net/certificates/solana-sign-service-tls-dev
+  name: solana-sign-service-ingress
+  namespace: default
 spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
   rules:
-  - host: secrets.dev.wayru.tech  
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: solana-sign-service  
-            port:
-              number: 80  
+    - host: secrets.dev.wayru.tech
+      http:
+        paths:
+          - backend:
+              service:
+                name: solana-sign-service
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - secrets.dev.wayru.tech
+      secretName: keyvault-solana-sign-service-ingress
