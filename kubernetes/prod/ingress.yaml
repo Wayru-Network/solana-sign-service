@@ -1,24 +1,58 @@
-
-apiVersion: networking.k8s.io/v1
 kind: Ingress
+apiVersion: networking.k8s.io/v1
 metadata:
-  name: solana-sign-service-ingress
+  name: solana-sin-service-ingress
+  namespace: default
+  uid: 8d4517d0-30ed-4647-91b9-38145eee0eb3
+  resourceVersion: '402399'
+  generation: 1
+  creationTimestamp: '2025-02-09T18:10:17Z'
   annotations:
-    kubernetes.io/ingress.class: "addon-http-application-routing"
-    cert-manager.io/cluster-issuer: "letsencrypt"
+    kubernetes.azure.com/tls-cert-keyvault-uri: >-
+      https://secrets-keys-store.vault.azure.net/certificates/solana-sign-service-tls
+  managedFields:
+    - manager: Mozilla
+      operation: Update
+      apiVersion: networking.k8s.io/v1
+      time: '2025-02-09T18:10:17Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:kubernetes.azure.com/tls-cert-keyvault-uri: {}
+        f:spec:
+          f:ingressClassName: {}
+          f:rules: {}
+          f:tls: {}
+    - manager: nginx-ingress-controller
+      operation: Update
+      apiVersion: networking.k8s.io/v1
+      time: '2025-02-09T18:10:53Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:loadBalancer:
+            f:ingress: {}
+      subresource: status
 spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
   tls:
-  - hosts:
-    - ${DOMAIN_NAME}
-    secretName: solana-sign-service-tls
+    - hosts:
+        - secrets.wayru.tech
+      secretName: keyvault-solana-sin-service-ingress
   rules:
-  - host: ${DOMAIN_NAME}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: solana-sign-service
-            port:
-              number: 80
+    - host: secrets.wayru.tech
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: solana-sign-service
+                port:
+                  number: 80
+status:
+  loadBalancer:
+    ingress:
+      - ip: 4.236.12.88
