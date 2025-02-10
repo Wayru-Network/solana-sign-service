@@ -1,22 +1,26 @@
 import pool from "@/config/db";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { ClaimerType } from "@/interfaces/request-transaction/request-transaction.interface";
-import { ClaimRewardHistory, ClaimRewardHistoryStatus } from "@/interfaces/claim-reward-histories/claim-reward-histories";
+import { CifradedSignatureStatus, TransactionTracker, VerifySignatureStatusToClaim } from "@interfaces/request-transaction/transaction-tracker";
 
-export const verifySignatureStatus = async (signature: string, rewardsId: number[], minerId: number, claimerType: ClaimerType) => {
+export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, rewardsId, minerId, claimerType }: VerifySignatureStatusToClaim) => {
 
     // validations for signature and rewards id:
     // 1: signature is equal to the signature in the database
     // 2: document status is equal to claiming
     // 3: all rewardsId are linked to the document
     const signatureUsed = await pool.query(
-        `SELECT crh.*, 
-            (SELECT ARRAY_AGG(crl.rewards_per_epoch_id) 
-             FROM claim_reward_histories_rewards_per_epoches_links crl 
-             WHERE crl.claim_reward_history_id = crh.id) as linked_rewards
-         FROM claim_reward_histories crh 
-         WHERE crh.cifraded_signature = $1 AND crh.status = $2`,
-        [signature, 'requesting-admin-authorization']
+        `SELECT tt.*,
+            ARRAY(
+                SELECT rewards_per_epoch_id::text 
+                FROM transaction_trackers_rewards_per_epoches_links
+                WHERE transaction_tracker_id = tt.id
+            ) as linked_rewards
+         FROM transaction_trackers tt 
+         WHERE tt.cifraded_signature = $1 
+         AND tt.id = $2 
+         AND tt.cifraded_signature_status = $3
+         AND tt.transaction_type = $4`,
+        [signature, nonce, 'requesting_admin_authorization', 'claim_rewards']
     );
     const document = signatureUsed.rows.length > 0 ? signatureUsed.rows[0] : null;
     if (!document) {
@@ -27,7 +31,7 @@ export const verifySignatureStatus = async (signature: string, rewardsId: number
     }
     // Verify that all provided rewardsId exist in the linked rewards
     const linkedRewardsMatch = rewardsId.every(id =>
-        document.linked_rewards?.includes(id)
+        document.linked_rewards?.includes(id.toString())
     );
     if (!linkedRewardsMatch) {
         return {
@@ -61,11 +65,29 @@ export const verifySignatureStatus = async (signature: string, rewardsId: number
     }
 }
 
-export const updateClaimRewardHistoryStatus = async (signature: string, status: ClaimRewardHistoryStatus) => {
+
+export const updateTransactionTrackerStatus = async (nonce: number, status: CifradedSignatureStatus) => {
+    if (!nonce) {
+        return null;
+    }
     const documentQuery = await pool.query(
-        `UPDATE claim_reward_histories SET status = $1 WHERE cifraded_signature = $2 RETURNING *`,
-        [status, signature]
+        `UPDATE transaction_trackers SET cifraded_signature_status = $1 WHERE id = $2 RETURNING *`,
+        [status, nonce]
     );
     const document = documentQuery.rows.length > 0 ? documentQuery.rows[0] : null;
-    return document as ClaimRewardHistory | null;
+    return document as TransactionTracker | null;
+}
+
+export const validateSignatureStatus = async (nonce: number, signature: string) => {
+    const document = await pool.query(
+        `SELECT * FROM transaction_trackers WHERE id = $1 AND cifraded_signature = $2 AND cifraded_signature_status = $3`,
+        [nonce, signature, 'requesting_admin_authorization']
+    );
+    return document.rows.length > 0 ? {
+        isValid: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE
+    } : {
+        isValid: false,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
+    };
 }

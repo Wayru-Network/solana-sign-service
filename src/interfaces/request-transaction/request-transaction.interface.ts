@@ -44,6 +44,7 @@ export interface ClaimRewardsMessage {
     rewardsId: number[];
     type: ClaimerType
     solanaAssetId: string;
+    nonce: number;
 }
 
 export interface InitializeNfnodeMessage {
@@ -52,18 +53,21 @@ export interface InitializeNfnodeMessage {
     manufacturerAddress: string;
     solanaAssetId: string;
     nfnodeType: { don: {} } | { byod: {} } | { wayruHotspot: {} }
+    nonce: number;
 }
 
 export interface UpdateHostMessage {
     walletOwnerAddress: string;
     hostAddress: string;
     solanaAssetId: string;
+    nonce: number;
 }
 
 export interface WithdrawTokensMessage {
     walletAddress: string;
     solanaAssetId: string;
     userNFTTokenAccount: string;
+    nonce: number;
 }
 
 // Mapping between message types and their payloads
