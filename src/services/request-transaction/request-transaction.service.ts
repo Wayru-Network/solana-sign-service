@@ -191,8 +191,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const mint = new PublicKey(ENV.REWARD_TOKEN_MINT)
         const nftMint = new PublicKey(solanaAssetId)
         const amountToClaim = new BN(convertToTokenAmount(totalAmount));
-        const bnNonce = new BN(Date.now());  //TODO: This is only for testing purposes, we need to use this: new BN(nonce);
-
+        const bnNonce = new BN(nonce);
 
         // prepare params to claim reward
         const accounts = await prepareAccountsToClaimReward({ program, mint, userWallet: user, nftMint, claimerType, adminKeypair })
