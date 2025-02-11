@@ -7,8 +7,9 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
-import { updateClaimRewardHistoryStatus, verifySignatureStatus } from "./request-transactions-queries";
+import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
+import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards } from "../transaction-tracker/transaction-tracker.service";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -35,10 +36,20 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId, nfnodeType } = data;
+        const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId, nfnodeType, nonce } = data;
+
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
 
         // prepare transaction parameters
-        const nonce = new BN(Date.now());
+        const bnNonce = new BN(nonce);
         const program = await getRewardSystemProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletOwnerAddress); // owner of the NFT
@@ -54,17 +65,22 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             [Buffer.from("admin_account")],
             program.programId
         );
+        // Derivar token storage authority PDA
         const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
             [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
             program.programId
         );
-        const [tokenStorageAccount] = PublicKey.findProgramAddressSync(
-            [Buffer.from("token_storage_account"), nftMintAddress.toBuffer()],
-            program.programId
-        );
+        // Obtener la cuenta de token del usuario
         const userTokenAccount = await getAssociatedTokenAddress(
             new PublicKey(ENV.REWARD_TOKEN_MINT),
             user
+        );
+
+        // Obtener la cuenta de token storage
+        const tokenStorageAccount = await getAssociatedTokenAddress(
+            new PublicKey(ENV.REWARD_TOKEN_MINT),
+            tokenStorageAuthority,
+            true // allowOwnerOffCurve = true para PDAs
         );
 
         const accounts = {
@@ -88,7 +104,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 
         // create a transaction
         const tx = await program.methods
-            .initializeNfnode(nonce, nfnodeType as Record<NFNodeType, never>)
+            .initializeNfnode(bnNonce, nfnodeType as Record<NFNodeType, never>)
             .accounts(accounts)
             .transaction()
 
@@ -105,6 +121,9 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             requireAllSignatures: false,
             verifySignatures: false,
         });
+
+        // update tx status
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
 
         return {
             serializedTx: serializedTx.toString("base64"),
@@ -128,6 +147,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
  */
 export const requestTransactionToClaimReward = async (signature: string): RequestTransactionResponse => {
+    let nonceFDB: number | undefined;
     try {
         const { isValid, message } = await verifyRewardsSignature(signature);
         if (!isValid || !message) {
@@ -145,10 +165,16 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletAddress, totalAmount, minerId, rewardsId, type: claimerType, solanaAssetId } = data;
+        const { walletAddress, totalAmount, minerId, rewardsId, type: claimerType, solanaAssetId, nonce } = data;
 
         // first verify the signature status
-        const { isValidStatus, code } = await verifySignatureStatus(signature, rewardsId, minerId, claimerType);
+        const { isValidStatus, code } = await verifyTransactionTrackerToClaimRewards({
+            signature,
+            rewardsId,
+            minerId,
+            claimerType,
+            nonce
+        });
         if (!isValidStatus) {
             return {
                 serializedTx: null,
@@ -156,6 +182,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 code: code
             };
         }
+        nonceFDB = nonce;
 
         // prepare transaction parameters
         const program = await getRewardSystemProgram();
@@ -164,7 +191,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const mint = new PublicKey(ENV.REWARD_TOKEN_MINT)
         const nftMint = new PublicKey(solanaAssetId)
         const amountToClaim = new BN(convertToTokenAmount(totalAmount));
-        const nonce = new BN(Date.now());
+        const bnNonce = new BN(nonce);
 
         // prepare params to claim reward
         const accounts = await prepareAccountsToClaimReward({ program, mint, userWallet: user, nftMint, claimerType, adminKeypair })
@@ -180,12 +207,12 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         // create a transaction
         if (claimerType === 'owner') {
             ix = await program.methods
-                .ownerClaimRewards(amountToClaim, nonce)
+                .ownerClaimRewards(amountToClaim, bnNonce)
                 .accounts(accounts as unknown as any)
                 .instruction();
         } else {
             ix = await program.methods
-                .othersClaimRewards(amountToClaim, nonce)
+                .othersClaimRewards(amountToClaim, bnNonce)
                 .accounts(accounts)
                 .instruction();
         }
@@ -207,8 +234,8 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const txBase64 = serializedTx.toString("base64");
 
         // update the status of claim reward history because the admin has authorized the claim
-        const updatedClaimRewardHistory = await updateClaimRewardHistoryStatus(signature, 'admin-authorization');
-        if (!updatedClaimRewardHistory) {
+        const updatedTransactionTracker = await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+        if (!updatedTransactionTracker) {
             return {
                 serializedTx: null,
                 error: true,
@@ -223,6 +250,9 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         }
     } catch (error) {
         console.error(`Error requesting transaction to claim reward:`, error);
+        if (nonceFDB !== undefined) {
+            await updateTransactionTrackerStatus(nonceFDB, 'request_unauthorized_by_admin');
+        }
         return {
             serializedTx: null,
             error: true,
@@ -255,7 +285,16 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletOwnerAddress, hostAddress, solanaAssetId } = data;
+        const { walletOwnerAddress, hostAddress, solanaAssetId, nonce } = data;
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
 
         // prepare transaction parameters 
         const connection = await getSolanaConnection();
@@ -264,11 +303,11 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         const nftMint = new PublicKey(solanaAssetId)
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const hostWalletAddress = new PublicKey(hostAddress)
-        const nonce = new BN(Date.now())
+        const bnNonce = new BN(nonce)
         const userNFTTokenAccount = await getUserNFTTokenAccount(nftMint, ownerAddress);
         // create the tx for the user
         const ix = await program.methods
-            .updateNfnode(nonce)
+            .updateNfnode(bnNonce)
             .accounts({
                 userAdmin: adminKeypair.publicKey,
                 user: ownerAddress,
@@ -335,7 +374,7 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
         const nftMint = new PublicKey(solanaAssetId);
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
-      
+
         const _signature = await program.methods
             .withdrawTokens()
             .accounts({
@@ -349,11 +388,11 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
             .rpc();
 
 
-            return {
-                serializedTx: null,
-                error: false,
-                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
-            }
+        return {
+            serializedTx: null,
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
 
     } catch (error) {
         console.error(`Error requesting transaction to withdraw tokens:`, error);

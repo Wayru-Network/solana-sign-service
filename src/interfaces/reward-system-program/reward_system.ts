@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/reward_system.json`.
  */
 export type RewardSystem = {
-  "address": "49YD9iaXY39zY8tycUg1vJvk6b4cDoVJNrbsmMkk3ihF",
+  "address": "98MWRmimeQobxgPx1atu3Dg9WGUeMP2zxjzoyuaPAZUu",
   "metadata": {
     "name": "rewardSystem",
     "version": "0.1.0",
@@ -59,6 +59,58 @@ export type RewardSystem = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "addMintAuthority",
+      "discriminator": [
+        41,
+        254,
+        251,
+        123,
+        155,
+        68,
+        213,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "adminAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "newMintAuthority",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "depositTokens",
@@ -994,6 +1046,9 @@ export type RewardSystem = {
           }
         },
         {
+          "name": "mintAuthority"
+        },
+        {
           "name": "tokenMint"
         },
         {
@@ -1002,7 +1057,7 @@ export type RewardSystem = {
         },
         {
           "name": "program",
-          "address": "49YD9iaXY39zY8tycUg1vJvk6b4cDoVJNrbsmMkk3ihF"
+          "address": "98MWRmimeQobxgPx1atu3Dg9WGUeMP2zxjzoyuaPAZUu"
         },
         {
           "name": "programData"
@@ -1760,6 +1815,58 @@ export type RewardSystem = {
       "args": []
     },
     {
+      "name": "removeMintAuthority",
+      "discriminator": [
+        33,
+        207,
+        52,
+        111,
+        106,
+        97,
+        9,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "adminAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "mintAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "unpauseProgram",
       "discriminator": [
         43,
@@ -2444,6 +2551,31 @@ export type RewardSystem = {
       "code": 6025,
       "name": "invalidMint",
       "msg": "Invalid token mint."
+    },
+    {
+      "code": 6026,
+      "name": "depositRequired",
+      "msg": "Deposit required."
+    },
+    {
+      "code": 6027,
+      "name": "unauthorizedMintAuthority",
+      "msg": "Unauthorized Mint Authority."
+    },
+    {
+      "code": 6028,
+      "name": "mintAuthorityAlreadyExists",
+      "msg": "Mint authority already exists."
+    },
+    {
+      "code": 6029,
+      "name": "mintAuthorityNotFound",
+      "msg": "Mint authority not found."
+    },
+    {
+      "code": 6030,
+      "name": "mintAuthorityListFull",
+      "msg": "Mint authority list is full."
     }
   ],
   "types": [
@@ -2471,6 +2603,12 @@ export type RewardSystem = {
           {
             "name": "validMint",
             "type": "pubkey"
+          },
+          {
+            "name": "mintAuthorities",
+            "type": {
+              "vec": "pubkey"
+            }
           }
         ]
       }

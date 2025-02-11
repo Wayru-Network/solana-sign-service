@@ -26,6 +26,7 @@ export const initializeNfnodeSchema = yup.object().shape({
   hostAddress: yup.string().required('Host address is required'),
   manufacturerAddress: yup.string().required('Manufacturer address is required'),
   solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required'),
   nfnodeType: yup.object().test(
     'is-valid-nfnode-type',
     'Invalid NFNode type format',
