@@ -49,7 +49,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         }
 
         // prepare transaction parameters
-        const bnNonce = new BN(nonce);
+        const hostShare = new BN(0); // host share of the NFT is 0
         const program = await getRewardSystemProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletOwnerAddress); // owner of the NFT
@@ -103,8 +103,9 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         } as const;
 
         // create a transaction
+        console.log('initialiazing nfnode')
         const tx = await program.methods
-            .initializeNfnode(bnNonce, nfnodeType as Record<NFNodeType, never>)
+            .initializeNfnode(hostShare, nfnodeType as Record<NFNodeType, never>)
             .accounts(accounts)
             .transaction()
 
