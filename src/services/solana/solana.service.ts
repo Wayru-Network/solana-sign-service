@@ -7,10 +7,10 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 export const getRewardSystemProgram = async () => {
+  console.log('ENV', ENV)
+  console.log('SOLANA_API_URL', SOLANA_API_URL)
   try {
     // get admin keypair
-    console.log('ENV', ENV)
-    console.log('SOLANA_API_URL', SOLANA_API_URL)
     if (!ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY) {
       throw new Error("ADMIN_REWARD_SYSTEM_PRIVATE_KEY is not set");
     }
