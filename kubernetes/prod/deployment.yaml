@@ -32,7 +32,7 @@ spec:
             - name: DB_ADMIN_PUBLIC_KEY
               value: 8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD
             - name: SOLANA_API_URL
-              value: https://api.devnet.solana.comom
+              value: https://api.devnet.solana.com
             - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
