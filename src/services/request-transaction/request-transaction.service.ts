@@ -103,7 +103,6 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         } as const;
 
         // create a transaction
-        console.log('initialiazing nfnode')
         const tx = await program.methods
             .initializeNfnode(hostShare, nfnodeType as Record<NFNodeType, never>)
             .accounts(accounts)
