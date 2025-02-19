@@ -61,6 +61,10 @@ export interface UpdateHostMessage {
     hostAddress: string;
     solanaAssetId: string;
     nonce: number;
+    feeToUpdateMetadata: number;
+    paymentToAddHostToNFnode: number;
+    solanaWalletAddressAdmin: string;
+    solanaTreasuryWalletAddress: string;
 }
 
 export interface WithdrawTokensMessage {

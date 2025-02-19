@@ -3,7 +3,7 @@ import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
@@ -285,7 +285,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletOwnerAddress, hostAddress, solanaAssetId, nonce } = data;
+        const { walletOwnerAddress, hostAddress, solanaAssetId, feeToUpdateMetadata, paymentToAddHostToNFnode, solanaWalletAddressAdmin, solanaTreasuryWalletAddress, nonce } = data;
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
@@ -305,8 +305,25 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         const hostWalletAddress = new PublicKey(hostAddress)
         const bnNonce = new BN(nonce)
         const userNFTTokenAccount = await getUserNFTTokenAccount(nftMint, ownerAddress);
+        const transaction = new Transaction();
+
+        // add transfer instruction
+         // Add SOL transfers
+         transaction.add(
+            SystemProgram.transfer({
+                fromPubkey: ownerAddress,
+                toPubkey: new PublicKey(solanaWalletAddressAdmin),
+                lamports: Math.round(feeToUpdateMetadata * LAMPORTS_PER_SOL),
+            }),
+            SystemProgram.transfer({
+                fromPubkey: ownerAddress,
+                toPubkey: new PublicKey(solanaTreasuryWalletAddress),
+                lamports: Math.round(paymentToAddHostToNFnode * LAMPORTS_PER_SOL),
+            })
+        );
+
         // create the tx for the user
-        const ix = await program.methods
+        const updateNfnodeIx = await program.methods
             .updateNfnode(bnNonce)
             .accounts({
                 userAdmin: adminKeypair.publicKey,
@@ -317,17 +334,21 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
                 tokenProgram2022: TOKEN_2022_PROGRAM_ID,
             })
             .instruction()
-        let tx = new anchor.web3.Transaction();
-        tx.add(ix)
-        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-        tx.feePayer = ownerAddress;
-        tx.partialSign(adminKeypair);
+
+        transaction.add(updateNfnodeIx)
+        transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        transaction.feePayer = ownerAddress;
+        // admin sign the transaction
+        transaction.partialSign(adminKeypair);
 
         // serialize tx
-        const serializedTx = tx.serialize({
+        const serializedTx = transaction.serialize({
             requireAllSignatures: false,
             verifySignatures: false,
         });
+
+        // update the status of the transaction
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
 
         return {
             serializedTx: serializedTx.toString("base64"),

@@ -57,7 +57,11 @@ export const initializeNfnodeSchema = yup.object().shape({
 export const updateHostSchema = yup.object().shape({
   walletOwnerAddress: yup.string().required('Wallet owner is required'),
   hostAddress: yup.string().required('Host address is required'),
-  solanaAssetId: yup.string().required('Solana asset ID is required')
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  feeToUpdateMetadata: yup.number().required('Fee to update metadata is required').positive('Fee must be positive'),
+  paymentToAddHostToNFnode: yup.number().required('Payment to add host to NFNode is required').positive('Payment must be positive'),
+  solanaWalletAddressAdmin: yup.string().required('Solana wallet address admin is required'),
+  solanaTreasuryWalletAddress: yup.string().required('Solana treasury wallet address is required')
 });
 
 export const withdrawTokensSchema = yup.object().shape({
