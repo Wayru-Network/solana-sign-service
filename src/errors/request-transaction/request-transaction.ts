@@ -1,4 +1,5 @@
 const errornIndex = 'SSS-'
+const simulateErrornIndex = 'SMS-'
 
 export const REQUEST_TRANSACTION_ERROR_CODES = {
     REQUEST_TRANSACTION_ERROR_CODE: errornIndex + '001',
@@ -22,5 +23,14 @@ export const REQUEST_TRANSACTION_ERROR_CODES = {
     REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE: errornIndex + '019',
     REQUEST_WITHDRAW_TOKENS_ERROR_CODE: errornIndex + '020',
     REQUEST_WITHDRAW_TOKENS_INVALID_SIGNATURE_ERROR_CODE: errornIndex + '021',
-    REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE: errornIndex + '022'
+    REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE: errornIndex + '022',
+    REQUEST_CLAIM_W_CREDITS_ERROR_CODE: errornIndex + '023'
+}
+
+export const SIMULATE_REQUEST_TX_CODES = {
+    INVALID_WALLET_ADDRESS: simulateErrornIndex + '001',
+    INSUFFICIENT_BALANCE: simulateErrornIndex + '002',
+    SIMULATION_FAILED: simulateErrornIndex + '003',
+    SUCCESS: simulateErrornIndex + '004',
+    UNKNOWN_ERROR: simulateErrornIndex + '005',
 }

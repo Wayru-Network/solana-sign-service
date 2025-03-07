@@ -25,6 +25,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.addHostToNfnode(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/to-claim-w-credits',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.claimWCredits(ctx);
+    }
   }
 ];
 

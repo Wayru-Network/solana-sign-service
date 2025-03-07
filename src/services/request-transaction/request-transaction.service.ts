@@ -1,7 +1,7 @@
 import { NFNodeType, RequestTransactionResponse } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
-import { convertToTokenAmount, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
+import { convertToTokenAmount, getAirdropsProgram, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -308,8 +308,8 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         const transaction = new Transaction();
 
         // add transfer instruction
-         // Add SOL transfers
-         transaction.add(
+        // Add SOL transfers
+        transaction.add(
             SystemProgram.transfer({
                 fromPubkey: ownerAddress,
                 toPubkey: new PublicKey(solanaWalletAddressAdmin),
@@ -421,6 +421,86 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
             serializedTx: null,
             error: true,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_ERROR_CODE
+        }
+    }
+}
+
+
+export const requestTransactionToClaimWCredits = async (signature: string): Promise<RequestTransactionResponse> => {
+    try {
+        // verify the signature
+        const { isValid, message } = await verifyRewardsSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        // process message data
+        const data = await proccessMessageData('claim-w-credits', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, amountToClaim, nonce } = data;
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+        
+        // get program 
+        const program = await getAirdropsProgram();
+        const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+        const user = new PublicKey(walletAddress); // owner of the NFT
+        const connection = await getSolanaConnection();
+        // amount to claim
+        const amount = new BN(convertToTokenAmount(2)); //new BN(convertToTokenAmount(amountToClaim)); REMOVE THIS, IT IS FOR TESTING
+        const ix = await program.methods
+        .claimTokens(amount, new BN(nonce))
+        .accounts({
+            userAdmin: adminKeypair.publicKey,
+            user: user,
+            tokenMint: new PublicKey(ENV.REWARD_TOKEN_MINT),
+        })
+        .instruction();
+
+        const tx = new Transaction();
+        tx.add(ix);
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;
+        tx.partialSign(adminKeypair);
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+        const txBase64 = serializedTx.toString("base64");
+
+        // update the status of the transaction
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin'); 
+
+        return {
+            serializedTx: txBase64,
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
+
+    } catch (error) {
+        console.error(`Error requesting transaction to claim w credits:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_W_CREDITS_ERROR_CODE
         }
     }
 }

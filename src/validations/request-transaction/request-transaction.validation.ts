@@ -69,3 +69,8 @@ export const withdrawTokensSchema = yup.object().shape({
   solanaAssetId: yup.string().required('Solana asset ID is required'),
   userNFTTokenAccount: yup.string().required('User NFT token account is required')
 });
+
+export const claimWCreditsSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  amountToClaim: yup.number().required('Amount to claim is required').positive('Amount must be positive')
+});
