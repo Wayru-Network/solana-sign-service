@@ -78,7 +78,7 @@ export const simulateClaimWCreditsTransaction = async (
         );
         const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
         const tokenAccountRent = !userTokenAccountInfo ? 
-            await connection.getMinimumBalanceForRentExemption(165) : // tamaño estándar de token account
+            await connection.getMinimumBalanceForRentExemption(165) : // standar size of the token account
             0;
 
         // calculate the total required balance
