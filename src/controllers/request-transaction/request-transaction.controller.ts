@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionToClaimReward, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -135,6 +135,52 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           message: 'internal server error'
+        };
+      }
+    }
+  }
+  static async claimWCredits(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionToClaimWCredits(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors,
+          code: 'CWC-001'
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error',
+          code: 'CWC-002'
         };
       }
     }

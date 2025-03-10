@@ -38,6 +38,7 @@ export async function authValidator(ctx: Context, next: Next) {
     const decoded = jwt.verify(jwtToken, ENV.JWT_SECRET as string) as { id: number, iat: number, exp: number };
     // check if token is expired
     if (decoded.exp < Date.now() / 1000) {
+      console.log('token expired');
       ctx.response.status = 401;
       ctx.response.body = {
         error: true,
@@ -49,6 +50,7 @@ export async function authValidator(ctx: Context, next: Next) {
     // attach user information to context state
     const user = await getUserById(decoded.id);
     if (!user) {
+      console.log('user not found');
       ctx.response.status = 401;
       ctx.response.body = {
         error: true,
@@ -59,6 +61,7 @@ export async function authValidator(ctx: Context, next: Next) {
     ctx.state.user = user;
     await next();
   } catch (error) {
+    console.log('error', error);
     ctx.response.status = 401;
     ctx.response.body = { 
       error: true,

@@ -34,7 +34,7 @@ export type RequestTransactionResponse = Promise<{ serializedTx: string | null, 
 
 
 /** Message types */
-export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode' | 'withdraw-tokens'
+export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode' | 'withdraw-tokens' | 'claim-w-credits'
 export type NFNodeType = 'don' | 'byod' | 'wayruHotspot'
 
 export interface ClaimRewardsMessage {
@@ -61,6 +61,10 @@ export interface UpdateHostMessage {
     hostAddress: string;
     solanaAssetId: string;
     nonce: number;
+    feeToUpdateMetadata: number;
+    paymentToAddHostToNFnode: number;
+    solanaWalletAddressAdmin: string;
+    solanaTreasuryWalletAddress: string;
 }
 
 export interface WithdrawTokensMessage {
@@ -70,10 +74,36 @@ export interface WithdrawTokensMessage {
     nonce: number;
 }
 
+export interface ClaimWCreditsMessage {
+    walletAddress: string;
+    amountToClaim: number;
+    nonce: number;
+}
+
 // Mapping between message types and their payloads
 export type PayloadProccessMessageByType = {
     'claim-rewards': ClaimRewardsMessage;
     'initialize-nfnode': InitializeNfnodeMessage;
     'add-host-to-nfnode': UpdateHostMessage;
     'withdraw-tokens': WithdrawTokensMessage;
+    'claim-w-credits': ClaimWCreditsMessage;
+}
+
+export interface SimulationClaimWCreditsResult {
+    feeInLamports: number;
+    feeInSol: number;
+    success: boolean;
+    error?: string;
+    details?: {
+        hasEnoughBalance: boolean;
+        userBalance: number;
+        requiredBalance: number;
+        rentExemptBalance?: number;
+        breakdown?: {
+            transactionFee: number;
+            claimEntryRent: number;
+            tokenAccountRent: number;
+        };
+    };
+    code?: string;
 }
