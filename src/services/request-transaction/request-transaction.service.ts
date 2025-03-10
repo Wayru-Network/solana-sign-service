@@ -456,22 +456,22 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
                 code: codeSignature
             };
         }
-        
+
         // get program 
         const program = await getAirdropsProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletAddress); // owner of the NFT
         const connection = await getSolanaConnection();
         // amount to claim
-        const amount = new BN(convertToTokenAmount(2)); //new BN(convertToTokenAmount(amountToClaim)); REMOVE THIS, IT IS FOR TESTING
+        const amount = new BN(convertToTokenAmount(amountToClaim));
         const ix = await program.methods
-        .claimTokens(amount, new BN(nonce))
-        .accounts({
-            userAdmin: adminKeypair.publicKey,
-            user: user,
-            tokenMint: new PublicKey(ENV.REWARD_TOKEN_MINT),
-        })
-        .instruction();
+            .claimTokens(amount, new BN(nonce))
+            .accounts({
+                userAdmin: adminKeypair.publicKey,
+                user: user,
+                tokenMint: new PublicKey(ENV.REWARD_TOKEN_MINT),
+            })
+            .instruction();
 
         const tx = new Transaction();
         tx.add(ix);
@@ -487,7 +487,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         const txBase64 = serializedTx.toString("base64");
 
         // update the status of the transaction
-        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin'); 
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
 
         return {
             serializedTx: txBase64,

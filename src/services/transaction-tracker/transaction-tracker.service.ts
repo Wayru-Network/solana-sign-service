@@ -1,6 +1,8 @@
 import pool from "@/config/db";
+import { REQUEST_TRANSACTION_EXPIRATION_TIME } from "@constants/request-transaction";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { CifradedSignatureStatus, TransactionTracker, VerifySignatureStatusToClaim } from "@interfaces/request-transaction/transaction-tracker";
+import moment from "moment";
 
 export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, rewardsId, minerId, claimerType }: VerifySignatureStatusToClaim) => {
 
@@ -27,6 +29,15 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
+        }
+    }
+
+    // validate if the document is older than 30 seconds
+    const isOlderThan30Seconds = moment(document?.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'));
+    if (isOlderThan30Seconds) {
+        return {
+            isValidStatus: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE
         }
     }
     // Verify that all provided rewardsId exist in the linked rewards
@@ -79,15 +90,28 @@ export const updateTransactionTrackerStatus = async (nonce: number, status: Cifr
 }
 
 export const validateSignatureStatus = async (nonce: number, signature: string) => {
-    const document = await pool.query(
+    const documents = await pool.query(
         `SELECT * FROM transaction_trackers WHERE id = $1 AND cifraded_signature = $2 AND cifraded_signature_status = $3`,
         [nonce, signature, 'requesting_admin_authorization']
     );
-    return document.rows.length > 0 ? {
+    const document = documents.rows.length > 0 ? documents.rows[0] : null;
+    if (!document) {
+        return {
+            isValid: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
+        }
+    }
+    // validate if the document is older than 30 seconds
+    const isOlderThan30Seconds = moment(document?.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'));
+    if (isOlderThan30Seconds) {
+        return {
+            isValid: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE
+        }
+    }
+
+    return {
         isValid: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE
-    } : {
-        isValid: false,
-        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
-    };
+    }
 }
