@@ -33,6 +33,12 @@ spec:
               value: 8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD
             - name: SOLANA_API_URL
               value: https://api.devnet.solana.com
+            - name: REWARD_TOKEN_MINT
+              value: CyVfcAhqHoY28roieSxAx9B4RCcGEDnVrxbwoc3oH7wa
+            - name: REWARD_SYSTEM_PROGRAM_ID
+              value: DGkrN8CiTvRSZbqa7rZjKJ5SHEmMm9Q7JMDjKubidhtV
+            - name: AIRDROPS_PROGRAM_ID
+              value: 5KK2ThgEp1AZM8bo79ijJcumSqz9B48bszyhYhuw3K7o
             - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
