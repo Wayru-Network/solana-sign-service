@@ -41,6 +41,8 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -176,6 +178,8 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
             nonce
         });
         if (!isValidStatus) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -289,6 +293,8 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -364,7 +370,6 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
     }
 }
 
-
 /**
  * Request a transaction to withdraw tokens
  * @param signature - The signature of the withdraw tokens message
@@ -425,7 +430,11 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
     }
 }
 
-
+/**
+ * Request a transaction to claim w credits
+ * @param signature - The signature of the claim w credits message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
 export const requestTransactionToClaimWCredits = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
         // verify the signature
@@ -450,6 +459,8 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
