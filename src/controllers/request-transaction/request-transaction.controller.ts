@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost, requestTransactionWidthdrawTokens } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost, requestTransactionWithdrawTokens } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -195,7 +195,7 @@ export class RequestTransactionController {
 
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
-      const response = await requestTransactionWidthdrawTokens(signature);
+      const response = await requestTransactionWithdrawTokens(signature);
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {

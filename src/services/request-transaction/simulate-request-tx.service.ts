@@ -6,6 +6,7 @@ import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { SimulationResult } from "@interfaces/request-transaction/request-transaction.interface";
 import { SIMULATE_REQUEST_TX_CODES } from "@errors/request-transaction/request-transaction";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
@@ -37,13 +38,14 @@ export const simulateClaimWCreditsTransaction = async (
         const amount = new BN(convertToTokenAmount(52));
         const nonce = new BN(Date.now());
 
-        // Usar la misma estructura de cuentas que la función que funciona
+        // Use the same account structure as the function that works
+        const rewardTokenMint = await getRewardTokenMint();
         const ix = await program.methods
             .claimTokens(amount, nonce)
             .accounts({
                 userAdmin: adminKeypair.publicKey,
                 user: user,
-                tokenMint: new PublicKey(ENV.REWARD_TOKEN_MINT),
+                tokenMint: new PublicKey(rewardTokenMint),
             })
             .instruction();
 
@@ -72,8 +74,9 @@ export const simulateClaimWCreditsTransaction = async (
         const rentExemptClaimEntry = await connection.getMinimumBalanceForRentExemption(CLAIM_ENTRY_SIZE);
 
         // get rent exempt for the token account if it doesn't exist
+        const tokenMint = await getRewardTokenMint();
         const userTokenAccount = await getAssociatedTokenAddress(
-            new PublicKey(ENV.REWARD_TOKEN_MINT),
+            new PublicKey(tokenMint),
             user
         );
         const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
