@@ -67,7 +67,7 @@ export const updateHostSchema = yup.object().shape({
 export const withdrawTokensSchema = yup.object().shape({
   walletAddress: yup.string().required('Wallet address is required'),
   solanaAssetId: yup.string().required('Solana asset ID is required'),
-  userNFTTokenAccount: yup.string().required('User NFT token account is required')
+  nonce: yup.number().required('Nonce is required')
 });
 
 export const claimWCreditsSchema = yup.object().shape({

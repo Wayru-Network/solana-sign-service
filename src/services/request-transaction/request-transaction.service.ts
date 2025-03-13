@@ -310,7 +310,13 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const hostWalletAddress = new PublicKey(hostAddress)
         const bnNonce = new BN(nonce)
-        const userNFTTokenAccount = await getUserNFTTokenAccount(nftMint, ownerAddress);
+        const userNFTTokenAccount = await getAssociatedTokenAddress(
+            nftMint,
+            ownerAddress,
+            false, // allowOwnerOffCurve
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
         const transaction = new Transaction();
 
         // add transfer instruction
@@ -375,7 +381,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
  * @param signature - The signature of the withdraw tokens message
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
  */
-export const requestTransactionWidthDrawTokens = async (signature: string): Promise<RequestTransactionResponse> => {
+export const requestTransactionWidthdrawTokens = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
         const { isValid, message } = await verifyRewardsSignature(signature);
         if (!isValid || !message) {
@@ -394,11 +400,32 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletAddress, solanaAssetId, userNFTTokenAccount } = data;
+        const { walletAddress, solanaAssetId, nonce } = data;
+
+        // validate signature status // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+
+        const connection = await getSolanaConnection();
         const program = await getRewardSystemProgram();
         const user = new PublicKey(walletAddress);
         const nftMint = new PublicKey(solanaAssetId);
-        const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+        // get the user nft token account
+        const userNFTTokenAccount = await getAssociatedTokenAddress(
+            nftMint,
+            user,
+            false, // allowOwnerOffCurve
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
         const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
 
         const _signature = await program.methods
@@ -410,12 +437,24 @@ export const requestTransactionWidthDrawTokens = async (signature: string): Prom
                 tokenProgram2022: TOKEN_2022_PROGRAM_ID,
                 userNftTokenAccount: _userNFTTokenAccount
             })
-            .signers([adminKeypair])
-            .rpc();
+            .instruction();
 
+        const tx = new Transaction();
+        tx.add(_signature);
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // update tx status
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
 
         return {
-            serializedTx: null,
+            serializedTx: serializedTx.toString("base64"),
             error: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
         }

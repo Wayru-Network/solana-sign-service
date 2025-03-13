@@ -70,7 +70,6 @@ export interface UpdateHostMessage {
 export interface WithdrawTokensMessage {
     walletAddress: string;
     solanaAssetId: string;
-    userNFTTokenAccount: string;
     nonce: number;
 }
 
@@ -89,7 +88,7 @@ export type PayloadProccessMessageByType = {
     'claim-w-credits': ClaimWCreditsMessage;
 }
 
-export interface SimulationClaimWCreditsResult {
+export interface SimulationResult {
     feeInLamports: number;
     feeInSol: number;
     success: boolean;
