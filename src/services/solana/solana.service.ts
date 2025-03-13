@@ -6,6 +6,7 @@ import { RewardSystem } from "@interfaces/reward-system-program/reward_system";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { AirdropsProgram } from "@interfaces/airdrops-program/airdrops_program";
+import { getAirdropsProgramId, getRewardSystemProgramId } from "@helpers/solana/solana.helpers";
 
 export const getRewardSystemProgram = async () => {
   try {
@@ -22,7 +23,9 @@ export const getRewardSystemProgram = async () => {
       new anchor.Wallet(adminKeypair as unknown as anchor.web3.Keypair), // Type cast to anchor's Keypair
       { commitment: "confirmed" }
     );
-    const programId = new anchor.web3.PublicKey(ENV.REWARD_SYSTEM_PROGRAM_ID);
+    // get program id from the db
+    const rewardSystemProgramId = await getRewardSystemProgramId();
+    const programId = new anchor.web3.PublicKey(rewardSystemProgramId);
     //only for devnet because it required fee
     if (ENV.NODE_ENV === 'develop') {
       const idl = await anchor.Program.fetchIdl(programId, provider);
@@ -85,7 +88,8 @@ export const getAirdropsProgram = async () => {
       new anchor.Wallet(adminKeypair as unknown as anchor.web3.Keypair), // Type cast to anchor's Keypair
       { commitment: "confirmed" }
     );
-    const programId = new anchor.web3.PublicKey(ENV.AIRDROPS_PROGRAM_ID);
+    const airdropsProgramId = await getAirdropsProgramId();
+    const programId = new anchor.web3.PublicKey(airdropsProgramId);
     //only for devnet because it required fee
     if (ENV.NODE_ENV === 'develop') {
       const idl = await anchor.Program.fetchIdl(programId, provider);

@@ -1,3 +1,5 @@
+import { ENV } from '@config/env/env';
+import { getKeyByName } from '@services/keys/keys-queries';
 import { Keypair as KeypairHelper } from '@solana/web3.js';
 
 /**
@@ -18,4 +20,25 @@ export const getKeyPairFromUnit8Array = (unit8Array: Uint8Array) => {
         console.error(`Error creating admin keypair:`, e);
         throw e;
     }
+}
+
+export const getRewardTokenMint = async () => {
+    const key = await getKeyByName('REWARD_TOKEN_MINT');
+    const id = key?.value || ENV.DEFAULT_REWARD_TOKEN_MINT;
+    // remove all spaces
+    return id.replace(/\s/g, '');
+}
+
+export const getRewardSystemProgramId = async () => {
+    const key = await getKeyByName('REWARD_SYSTEM_PROGRAM_ID');
+    const id = key?.value || ENV.DEFAULT_REWARD_SYSTEM_PROGRAM_ID;
+    // remove all spaces
+    return id.replace(/\s/g, '');
+}
+
+export const getAirdropsProgramId = async () => {
+    const key = await getKeyByName('AIRDROPS_PROGRAM_ID');
+    const id = key?.value || ENV.DEFAULT_AIRDROPS_PROGRAM_ID;
+    // remove all spaces
+    return id.replace(/\s/g, '');
 }
