@@ -3,13 +3,13 @@ import { BN } from "bn.js";
 import { getAirdropsProgram, getSolanaConnection, convertToTokenAmount } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
-import { SimulationClaimWCreditsResult } from "@interfaces/request-transaction/request-transaction.interface";
+import { SimulationResult } from "@interfaces/request-transaction/request-transaction.interface";
 import { SIMULATE_REQUEST_TX_CODES } from "@errors/request-transaction/request-transaction";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
-): Promise<SimulationClaimWCreditsResult> => {
+): Promise<SimulationResult> => {
     try {
         const program = await getAirdropsProgram();
         const connection = await getSolanaConnection();

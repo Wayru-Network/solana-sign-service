@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost, requestTransactionWidthdrawTokens } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -181,6 +181,52 @@ export class RequestTransactionController {
           error: true,
           message: 'internal server error',
           code: 'CWC-002'
+        };
+      }
+    }
+  }
+  static async withdrawTokens(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionWidthdrawTokens(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors,
+          code: 'WT-001'
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error',
+          code: 'WT-002'
         };
       }
     }

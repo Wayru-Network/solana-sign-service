@@ -32,6 +32,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.claimWCredits(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/to-withdraw-tokens',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawTokens(ctx);
+    }
   }
 ];
 
