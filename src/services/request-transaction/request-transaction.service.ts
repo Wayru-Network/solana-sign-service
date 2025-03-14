@@ -7,7 +7,7 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
-import { getRewardTokenMint, getRewardSystemProgramId } from "@helpers/solana/solana.helpers";
+import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
 import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards } from "../transaction-tracker/transaction-tracker.service";

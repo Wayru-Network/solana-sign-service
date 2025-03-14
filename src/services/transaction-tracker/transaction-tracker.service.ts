@@ -60,7 +60,7 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
             ON rpe.id = rpel.rewards_per_epoch_id
          WHERE rpel.nfnode_id = $1 
             AND rpe.status = $2
-            AND rpe.${claimerType === 'owner' ? 'owner_payment_status' : 'host_payment_status'} = 'pending'`,
+            AND rpe.${claimerType === 'owner' ? 'owner_payment_status' : 'host_payment_status'} = 'claiming'`,
         [minerId, 'ready-for-claim']
     );
     if (rewardsPerEpoch?.rows?.length === 0) {
