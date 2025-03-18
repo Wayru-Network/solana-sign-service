@@ -5,7 +5,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema } from "@validations/request-transaction/request-transaction.validation";
+import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema } from "@validations/request-transaction/request-transaction.validation";
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -167,6 +167,9 @@ export const proccessMessageData = async <T extends MessageType>(type: T, messag
                 return data;
             case 'claim-w-credits':
                 await claimWCreditsSchema.validate(data);
+                return data;
+            case 'deposit-tokens':
+                await depositTokensSchema.validate(data);
                 return data;
             default:
                 return null;

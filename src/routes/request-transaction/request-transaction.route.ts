@@ -39,6 +39,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.withdrawTokens(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/to-deposit-tokens',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.depositTokens(ctx);
+    }
   }
 ];
 

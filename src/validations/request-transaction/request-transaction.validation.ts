@@ -74,3 +74,9 @@ export const claimWCreditsSchema = yup.object().shape({
   walletAddress: yup.string().required('Wallet address is required'),
   amountToClaim: yup.number().required('Amount to claim is required').positive('Amount must be positive')
 });
+
+export const depositTokensSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required')
+});
