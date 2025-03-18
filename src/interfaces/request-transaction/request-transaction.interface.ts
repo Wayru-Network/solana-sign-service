@@ -34,7 +34,7 @@ export type RequestTransactionResponse = Promise<{ serializedTx: string | null, 
 
 
 /** Message types */
-export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode' | 'withdraw-tokens' | 'claim-w-credits'
+export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode' | 'withdraw-tokens' | 'claim-w-credits' | 'deposit-tokens'
 export type NFNodeType = 'don' | 'byod' | 'wayruHotspot'
 
 export interface ClaimRewardsMessage {
@@ -79,6 +79,12 @@ export interface ClaimWCreditsMessage {
     nonce: number;
 }
 
+export interface DepositTokensMessage {
+    walletAddress: string;
+    solanaAssetId: string;
+    nonce: number;
+}
+
 // Mapping between message types and their payloads
 export type PayloadProccessMessageByType = {
     'claim-rewards': ClaimRewardsMessage;
@@ -86,6 +92,7 @@ export type PayloadProccessMessageByType = {
     'add-host-to-nfnode': UpdateHostMessage;
     'withdraw-tokens': WithdrawTokensMessage;
     'claim-w-credits': ClaimWCreditsMessage;
+    'deposit-tokens': DepositTokensMessage;
 }
 
 export interface SimulationResult {

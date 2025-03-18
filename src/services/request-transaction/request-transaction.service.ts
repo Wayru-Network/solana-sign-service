@@ -560,3 +560,86 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         }
     }
 }
+
+export const requestTransactionDepositTokens = async (signature: string): Promise<RequestTransactionResponse> => {
+    try {
+        const { isValid, message } = await verifyRewardsSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        const data = await proccessMessageData('deposit-tokens', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, solanaAssetId, nonce } = data;
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+        const connection = await getSolanaConnection();
+        const program = await getRewardSystemProgram();
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(solanaAssetId);
+        const userNFTTokenAccount = await getAssociatedTokenAddress(
+            nftMint,
+            user,
+            false, // allowOwnerOffCurve
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const rewardTokenMint = await getRewardTokenMint();
+
+        const ix = await program.methods
+            .depositTokens()
+            .accounts({
+                user: user,
+                tokenMint: new PublicKey(rewardTokenMint),
+                nftMintAddress: nftMint,
+                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                userNftTokenAccount: userNFTTokenAccount
+            })
+            .instruction();
+
+        const tx = new Transaction();
+        tx.add(ix);
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // update the status of the transaction
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+
+        return {
+            serializedTx: serializedTx.toString("base64"),
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
+    } catch (error) {
+        console.error(`Error requesting transaction to deposit tokens:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_ERROR_CODE
+        }
+    }
+}
