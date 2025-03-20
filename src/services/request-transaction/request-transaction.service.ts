@@ -6,7 +6,7 @@ import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { prepareAccountsToClaimReward, verifyTrasactionSignature, processMessageData } from "@helpers/request-transaction/request-transaction.helper";
+import { prepareAccountsToClaimReward, verifyTransactionSignature, processMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
@@ -20,7 +20,7 @@ import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards 
 export const requestTransactionToInitializeNfnode = async (signature: string): RequestTransactionResponse => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -154,7 +154,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 export const requestTransactionToClaimReward = async (signature: string): RequestTransactionResponse => {
     let nonceFDB: number | undefined;
     try {
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -277,7 +277,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
 export const requestTransactionToUpdateHost = async (signature: string): RequestTransactionResponse => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -387,7 +387,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
  */
 export const requestTransactionWithdrawTokens = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -482,7 +482,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
 export const requestTransactionToClaimWCredits = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -568,7 +568,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
  */
 export const requestTransactionDepositTokens = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
-        const { isValid, message } = await verifyTrasactionSignature(signature);
+        const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
