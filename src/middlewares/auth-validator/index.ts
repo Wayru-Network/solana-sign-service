@@ -13,7 +13,7 @@ export async function errorHandler(ctx: Context, next: Next) {
       message: err.message || 'Internal server error',
     };
 
-    // Emitir el error para logging
+    // Emit error for logging
     ctx.app.emit('error', err, ctx);
   }
 }

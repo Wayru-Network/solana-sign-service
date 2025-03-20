@@ -126,7 +126,7 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
     return accounts
 }
 
-export const verifyTrasactionSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
+export const verifyTransactionSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
     try {
         const transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
 
@@ -147,7 +147,7 @@ export const verifyTrasactionSignature = async (serializedTransaction: string): 
     }
 }
 
-export const proccessMessageData = async <T extends MessageType>(type: T, message: string) => {
+export const processMessageData = async <T extends MessageType>(type: T, message: string) => {
     try {
         const data = JSON.parse(message) as PayloadProccessMessageByType[T];
 
