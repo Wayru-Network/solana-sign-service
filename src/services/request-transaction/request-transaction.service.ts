@@ -6,7 +6,7 @@ import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { prepareAccountsToClaimReward, verifyRewardsSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
+import { prepareAccountsToClaimReward, verifyTrasactionSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
@@ -20,7 +20,7 @@ import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards 
 export const requestTransactionToInitializeNfnode = async (signature: string): RequestTransactionResponse => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -154,7 +154,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 export const requestTransactionToClaimReward = async (signature: string): RequestTransactionResponse => {
     let nonceFDB: number | undefined;
     try {
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -198,7 +198,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const user = new PublicKey(walletAddress);
         const mint = new PublicKey(rewardTokenMint)
         const nftMint = new PublicKey(solanaAssetId)
-        const amountToClaim = new BN(convertToTokenAmount(totalAmount));
+        const amountToClaim = new BN(convertToTokenAmount(2)); //new BN(convertToTokenAmount(totalAmount));
         const bnNonce = new BN(nonce);
 
         // prepare params to claim reward
@@ -277,7 +277,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
 export const requestTransactionToUpdateHost = async (signature: string): RequestTransactionResponse => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -387,7 +387,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
  */
 export const requestTransactionWithdrawTokens = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -482,7 +482,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
 export const requestTransactionToClaimWCredits = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
         // verify the signature
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
@@ -561,9 +561,14 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
     }
 }
 
+/**
+ * Request a transaction to deposit tokens
+ * @param signature - The signature of the deposit tokens message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
 export const requestTransactionDepositTokens = async (signature: string): Promise<RequestTransactionResponse> => {
     try {
-        const { isValid, message } = await verifyRewardsSignature(signature);
+        const { isValid, message } = await verifyTrasactionSignature(signature);
         if (!isValid || !message) {
             return {
                 serializedTx: null,
