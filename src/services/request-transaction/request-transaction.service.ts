@@ -6,7 +6,7 @@ import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-import { prepareAccountsToClaimReward, verifyTrasactionSignature, proccessMessageData } from "@helpers/request-transaction/request-transaction.helper";
+import { prepareAccountsToClaimReward, verifyTrasactionSignature, processMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
@@ -29,7 +29,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             };
         }
 
-        const data = await proccessMessageData('initialize-nfnode', message);
+        const data = await processMessageData('initialize-nfnode', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -162,7 +162,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE
             };
         };
-        const data = await proccessMessageData('claim-rewards', message);
+        const data = await processMessageData('claim-rewards', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -285,7 +285,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_SIGNATURE_ERROR_CODE
             };
         }
-        const data = await proccessMessageData('add-host-to-nfnode', message);
+        const data = await processMessageData('add-host-to-nfnode', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -396,7 +396,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
             };
         }
         // decode the message
-        const data = await proccessMessageData('withdraw-tokens', message);
+        const data = await processMessageData('withdraw-tokens', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -491,7 +491,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
             };
         }
         // process message data
-        const data = await proccessMessageData('claim-w-credits', message);
+        const data = await processMessageData('claim-w-credits', message);
         if (!data) {
             return {
                 serializedTx: null,
@@ -576,7 +576,7 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_INVALID_SIGNATURE_ERROR_CODE
             };
         }
-        const data = await proccessMessageData('deposit-tokens', message);
+        const data = await processMessageData('deposit-tokens', message);
         if (!data) {
             return {
                 serializedTx: null,

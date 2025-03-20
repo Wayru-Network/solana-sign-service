@@ -147,7 +147,7 @@ export const verifyTrasactionSignature = async (serializedTransaction: string): 
     }
 }
 
-export const proccessMessageData = async <T extends MessageType>(type: T, message: string) => {
+export const processMessageData = async <T extends MessageType>(type: T, message: string) => {
     try {
         const data = JSON.parse(message) as PayloadProccessMessageByType[T];
 
