@@ -126,7 +126,7 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
     return accounts
 }
 
-export const verifyRewardsSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
+export const verifyTrasactionSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
     try {
         const transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
 
