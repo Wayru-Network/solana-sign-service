@@ -25,7 +25,7 @@ spec:
               value: "5432"
             - name: DATABASE_USERNAME
               value: adminDB
-            - name: NDODE_ENV
+            - name: NODE_ENV
               value: develop
             - name: PORT
               value: "80"
