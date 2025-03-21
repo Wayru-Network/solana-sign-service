@@ -6,7 +6,7 @@ import { dbErrorHandler } from "@middlewares/db-error-handler";
 import  router from "@routes/api.routes";
 import { ENV } from "@config/env/env";
 import cors from '@koa/cors';
-import { PRODUCTION_ORIGINS } from "@constants/api/indext";
+import { PRODUCTION_ORIGINS } from "@constants/api";
 
 
 const app = new Koa();

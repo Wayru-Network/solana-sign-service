@@ -1,4 +1,4 @@
-import { NFNodeType, RequestTransactionResponse } from "@interfaces/request-transaction/request-transaction.interface";
+import { NFNodeTypeEnum, RequestTransactionResponse } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import { convertToTokenAmount, getAirdropsProgram, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
@@ -68,7 +68,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             [Buffer.from("admin_account")],
             program.programId
         );
-        // Derivar token storage authority PDA
+        // Derive token storage authority PDA
         const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
             [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
             program.programId
@@ -109,7 +109,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 
         // create a transaction
         const tx = await program.methods
-            .initializeNfnode(hostShare, nfnodeType as Record<NFNodeType, never>)
+            .initializeNfnode(hostShare, nfnodeType as Record<NFNodeTypeEnum, never>)
             .accounts(accounts)
             .transaction()
 
