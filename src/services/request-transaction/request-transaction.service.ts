@@ -198,7 +198,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const user = new PublicKey(walletAddress);
         const mint = new PublicKey(rewardTokenMint)
         const nftMint = new PublicKey(solanaAssetId)
-        const amountToClaim = new BN(convertToTokenAmount(2)); //new BN(convertToTokenAmount(totalAmount));
+        const amountToClaim = new BN(convertToTokenAmount(totalAmount));
         const bnNonce = new BN(nonce);
 
         // prepare params to claim reward
