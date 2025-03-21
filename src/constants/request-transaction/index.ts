@@ -1,0 +1,2 @@
+
+export const REQUEST_TRANSACTION_EXPIRATION_TIME = 30; // seconds

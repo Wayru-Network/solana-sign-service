@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": ".ts",
+  "ignore": ["src/**/*.spec.ts"],
+  "exec": "ts-node --files -r ./tsconfig-paths-bootstrap.cjs src/server.ts"
+} 

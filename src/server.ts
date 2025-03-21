@@ -1,23 +1,42 @@
 import Koa from "koa";
 import bodyParser from "koa-bodyparser";
 import logger from "koa-logger";
-import { errorHandler } from "./middlewares/authValidator";
-import transactionRoutes from "./routes/transactionRoutes";
-import { ENV } from "./config/env";
+import { errorHandler } from "@middlewares/auth-validator";
+import { dbErrorHandler } from "@middlewares/db-error-handler";
+import  router from "@routes/api.routes";
+import { ENV } from "@config/env/env";
+import cors from '@koa/cors';
+import { PRODUCTION_ORIGINS } from "@constants/api";
+
 
 const app = new Koa();
-
 // Middlewares
 app.use(logger());
 app.use(bodyParser());
+app.use(cors({
+  origin: (ctx) => {
+    if (ENV.NODE_ENV !== 'develop' && PRODUCTION_ORIGINS.includes(ctx.get('origin'))) {
+      return ctx.get('origin');
+    }
+    return '*';
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
+}));
 app.use(errorHandler);
+app.use(dbErrorHandler);
 
-// Rutas
-app.use(transactionRoutes.routes());
-app.use(transactionRoutes.allowedMethods());
+// Routes
+app.use(router.routes());
+app.use(router.allowedMethods());
 
-// Inicializar servidor
-const PORT = ENV.PORT;
-app.listen(PORT, () => {
+// Global error handling
+app.on('error', (err, ctx) => {
+  console.error('Server Error:', err);
+});
+
+// Initialize server
+const PORT = Number(ENV.PORT);
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
