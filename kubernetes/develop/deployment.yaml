@@ -24,7 +24,7 @@ spec:
             - name: DATABASE_PORT
               value: "5432"
             - name: DATABASE_USERNAME
-              value: adminDB
+              value: SIGNATURE_SERVICE
             - name: NODE_ENV
               value: develop
             - name: PORT
@@ -32,7 +32,7 @@ spec:
             - name: DB_ADMIN_PUBLIC_KEY
               value: 8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD
             - name: SOLANA_API_URL
-              value: https://api.devnet.solana.com
+              value: https://devnet.helius-rpc.com/
             - name: DEFAULT_REWARD_TOKEN_MINT
               value: CyVfcAhqHoY28roieSxAx9B4RCcGEDnVrxbwoc3oH7wa
             - name: DEFAULT_REWARD_SYSTEM_PROGRAM_ID
@@ -54,6 +54,11 @@ spec:
                 secretKeyRef:
                   name: signature-service-secrets
                   key: JWT_SECRET
+            - name: SOLANA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: signature-service-secrets
+                  key: SOLANA_API_KEY
         ports:
         - containerPort: 80
         resources:
