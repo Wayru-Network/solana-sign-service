@@ -1,4 +1,4 @@
-import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProccessMessageByType, MessageType } from "@/interfaces/request-transaction/request-transaction.interface";
+import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProcessMessageByType, MessageType, NFNodeType, NFNodeTypeEnum } from "@/interfaces/request-transaction/request-transaction.interface";
 import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -149,7 +149,7 @@ export const verifyTransactionSignature = async (serializedTransaction: string):
 
 export const processMessageData = async <T extends MessageType>(type: T, message: string) => {
     try {
-        const data = JSON.parse(message) as PayloadProccessMessageByType[T];
+        const data = JSON.parse(message) as PayloadProcessMessageByType[T];
 
         // validate schemas
         switch (type) {
@@ -179,3 +179,12 @@ export const processMessageData = async <T extends MessageType>(type: T, message
         return null;
     }
 }
+
+export const getNFNodeTypeRecord = (type: 'don' | 'byod' | 'wayru'): Record<NFNodeTypeEnum, never> => {
+    const typeMap = {
+        don: { don: {} },
+        byod: { byod: {} },
+        wayru: { wayruHotspot: {} }
+    };
+    return typeMap[type] as Record<NFNodeTypeEnum, never>
+};

@@ -1,12 +1,16 @@
-import { LAMPORTS_PER_SOL, PublicKey, Transaction, VersionedTransaction, TransactionMessage } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey, VersionedTransaction, TransactionMessage } from "@solana/web3.js";
 import { BN } from "bn.js";
-import { getAirdropsProgram, getSolanaConnection, convertToTokenAmount } from "../solana/solana.service";
+import { getAirdropsProgram, getSolanaConnection, convertToTokenAmount, getRewardSystemProgram, getUserNFTTokenAccount, getAdminKeypair } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
-import { SimulationResult } from "@interfaces/request-transaction/request-transaction.interface";
+import { } from "@interfaces/request-transaction/request-transaction.interface";
 import { SIMULATE_REQUEST_TX_CODES } from "@errors/request-transaction/request-transaction";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
+import { SystemProgram } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { SimulateInitNfnodeParams, SimulationResult } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
+import { getNFNodeTypeRecord } from "@helpers/request-transaction/request-transaction.helper";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
@@ -15,7 +19,7 @@ export const simulateClaimWCreditsTransaction = async (
         const program = await getAirdropsProgram();
         const connection = await getSolanaConnection();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
-        
+
         // validate wallet address
         try {
             new PublicKey(walletAddress); // Ensure the address is valid
@@ -30,10 +34,10 @@ export const simulateClaimWCreditsTransaction = async (
         }
 
         const user = new PublicKey(walletAddress);
-        
+
         // get user balance
         const userBalance = await connection.getBalance(user);
-        
+
         // create instruction
         const amount = new BN(convertToTokenAmount(52));
         const nonce = new BN(Date.now());
@@ -80,7 +84,7 @@ export const simulateClaimWCreditsTransaction = async (
             user
         );
         const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
-        const tokenAccountRent = !userTokenAccountInfo ? 
+        const tokenAccountRent = !userTokenAccountInfo ?
             await connection.getMinimumBalanceForRentExemption(165) : // standar size of the token account
             0;
 
@@ -113,14 +117,14 @@ export const simulateClaimWCreditsTransaction = async (
 
         // simulate transaction using the new method
         const simulation = await connection.simulateTransaction(transaction);
-        
+
         if (simulation.value.err) {
-            console.log('simulation failed', simulation.value.err);
+            console.log('simulation logs:', simulation.value.logs);
             return {
                 feeInLamports,
                 feeInSol: feeInLamports / LAMPORTS_PER_SOL,
                 success: false,
-                error: `Simulation failed: ${simulation.value.err.toString()}`,
+                error: JSON.stringify(simulation.value.err),
                 code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
                 details: {
                     hasEnoughBalance,
@@ -130,7 +134,7 @@ export const simulateClaimWCreditsTransaction = async (
                 }
             };
         }
-        
+
         return {
             feeInLamports,
             feeInSol: feeInLamports / LAMPORTS_PER_SOL,
@@ -146,6 +150,152 @@ export const simulateClaimWCreditsTransaction = async (
 
     } catch (error) {
         console.error('Error simulate claim w credits transaction:', error);
+        return {
+            feeInLamports: 0,
+            feeInSol: 0,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR
+        };
+    }
+};
+
+export const simulateInitializeNfnodeTransaction = async (
+    { walletAddress,
+        nftMintAddress,
+        nfnodeType
+    }: SimulateInitNfnodeParams): Promise<SimulationResult> => {
+    try {
+        const program = await getRewardSystemProgram();
+        const connection = await getSolanaConnection();
+        const tokenMint = await getRewardTokenMint();
+
+        // Initialize public keys
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(nftMintAddress);
+        const host = new PublicKey('8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD');
+        const manufacturer = new PublicKey('FCap4kWAPMMTvAqUgEX3oFmMmSzg7g3ytxknYD21hpzm');
+        const adminKeypair = getAdminKeypair();
+
+        // Get PDAs and accounts
+        const userNftTokenAccount = await getUserNFTTokenAccount(nftMint, user);
+        const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("nfnode_entry"), nftMint.toBuffer()],
+            program.programId
+        );
+        const [adminAccountPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("admin_account")],
+            program.programId
+        );
+        const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+            [Buffer.from("token_storage"), nftMint.toBuffer()],
+            program.programId
+        );
+
+        // Get ATAs
+        const userTokenAccount = await getAssociatedTokenAddress(
+            new PublicKey(tokenMint),
+            user
+        );
+        const tokenStorageAccount = await getAssociatedTokenAddress(
+            new PublicKey(tokenMint),
+            tokenStorageAuthority,
+            true
+        );
+
+        // Add initialize nfnode instruction
+        const accounts = {
+            userAdmin: adminKeypair.publicKey,
+            user,
+            nftMintAddress: nftMint,
+            userNftTokenAccount,
+            host,
+            manufacturer,
+            tokenMint: new PublicKey(tokenMint),
+            nfnodeEntry: nfnodeEntryPDA,
+            adminAccount: adminAccountPDA,
+            tokenStorageAuthority,
+            tokenStorageAccount,
+            userTokenAccount,
+            tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+        } as const;
+
+        const initializeNfnodeIx = await program.methods
+            .initializeNfnode(new BN(0), getNFNodeTypeRecord(nfnodeType))
+            .accounts(accounts)
+            .instruction();
+
+        // Get latest blockhash
+        const latestBlockhash = await connection.getLatestBlockhash();
+
+        // Create TransactionMessage
+        const messageV0 = new TransactionMessage({
+            payerKey: user,
+            recentBlockhash: latestBlockhash.blockhash,
+            instructions: [initializeNfnodeIx]
+        }).compileToV0Message();
+
+        // Create VersionedTransaction
+        const transaction = new VersionedTransaction(messageV0);
+
+        // Get user's current balance
+        const userBalance = await connection.getBalance(user);
+        
+        // Calculate rent exempt
+        const nfnodeEntryRent = await connection.getMinimumBalanceForRentExemption(165);
+
+        // Get transaction fee
+        const transactionFee = await connection.getFeeForMessage(messageV0);
+        if (transactionFee.value === null) {
+            throw new Error('Failed to get fee for message');
+        }
+        const feeInLamports = transactionFee.value || 0;
+        const totalRequired = nfnodeEntryRent + transactionFee.value;
+
+        // Simulate transaction
+        const simulation = await connection.simulateTransaction(transaction);
+
+        if (simulation.value.err) {
+            console.log('simulation logs:', simulation.value.logs);
+            return {
+                success: false,
+                feeInLamports: feeInLamports,
+                feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                error: JSON.stringify(simulation.value.err),
+                details: {
+                    hasEnoughBalance: userBalance >= totalRequired,
+                    userBalance: userBalance / LAMPORTS_PER_SOL,
+                    requiredBalance: totalRequired / LAMPORTS_PER_SOL,
+                    rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                    breakdown: {
+                        transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
+                        nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                    }
+                }
+            };
+        }
+
+        return {
+            success: true,
+            feeInLamports: feeInLamports,
+            feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+            details: {
+                hasEnoughBalance: userBalance >= totalRequired,
+                userBalance: userBalance / LAMPORTS_PER_SOL,
+                requiredBalance: totalRequired / LAMPORTS_PER_SOL,
+                rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                breakdown: {
+                    transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
+                    nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                }
+            }
+        };
+
+    } catch (error) {
+        console.error('Error in simulateInitializeNfnodeTransaction:', error);
         return {
             feeInLamports: 0,
             feeInSol: 0,

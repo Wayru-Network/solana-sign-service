@@ -108,3 +108,7 @@ export const getAirdropsProgram = async () => {
     throw error;
   }
 }
+
+export const getAdminKeypair = () => {
+  return getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+}

@@ -1,4 +1,4 @@
-import { InitializeNfnodeMessage, NFNodeType } from '@interfaces/request-transaction/request-transaction.interface';
+import { InitializeNfnodeMessage, NFNodeType, NFNodeTypeEnum } from '@interfaces/request-transaction/request-transaction.interface';
 import * as yup from 'yup';
 
 export const signatureInsideSchema = yup.object({
@@ -32,7 +32,7 @@ export const initializeNfnodeSchema = yup.object().shape({
     'Invalid NFNode type format',
     (value: Record<string, unknown>) => {
 
-      const validTypes: Array<NFNodeType> = ['don', 'byod', 'wayruHotspot'];
+      const validTypes: Array<NFNodeTypeEnum> = ['don', 'byod', 'wayruHotspot'];
       const keys = Object.keys(value || {});
 
       if (keys.length !== 1) {
@@ -40,7 +40,7 @@ export const initializeNfnodeSchema = yup.object().shape({
         return false;
       }
 
-      const type = keys[0] as NFNodeType;
+      const type = keys[0] as NFNodeTypeEnum;
       if (!validTypes.includes(type)) {
         return false;
       }

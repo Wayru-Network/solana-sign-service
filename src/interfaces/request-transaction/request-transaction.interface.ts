@@ -35,7 +35,8 @@ export type RequestTransactionResponse = Promise<{ serializedTx: string | null, 
 
 /** Message types */
 export type MessageType = 'claim-rewards' | 'initialize-nfnode' | 'add-host-to-nfnode' | 'withdraw-tokens' | 'claim-w-credits' | 'deposit-tokens'
-export type NFNodeType = 'don' | 'byod' | 'wayruHotspot'
+export type NFNodeTypeEnum = 'don' | 'byod' | 'wayruHotspot'
+export type NFNodeType = 'don' | 'byod' | 'wayru'
 
 export interface ClaimRewardsMessage {
     walletAddress: string;
@@ -86,7 +87,7 @@ export interface DepositTokensMessage {
 }
 
 // Mapping between message types and their payloads
-export type PayloadProccessMessageByType = {
+export type PayloadProcessMessageByType = {
     'claim-rewards': ClaimRewardsMessage;
     'initialize-nfnode': InitializeNfnodeMessage;
     'add-host-to-nfnode': UpdateHostMessage;
@@ -95,21 +96,3 @@ export type PayloadProccessMessageByType = {
     'deposit-tokens': DepositTokensMessage;
 }
 
-export interface SimulationResult {
-    feeInLamports: number;
-    feeInSol: number;
-    success: boolean;
-    error?: string;
-    details?: {
-        hasEnoughBalance: boolean;
-        userBalance: number;
-        requiredBalance: number;
-        rentExemptBalance?: number;
-        breakdown?: {
-            transactionFee: number;
-            claimEntryRent: number;
-            tokenAccountRent: number;
-        };
-    };
-    code?: string;
-}
