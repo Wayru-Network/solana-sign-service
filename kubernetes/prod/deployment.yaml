@@ -18,9 +18,9 @@ spec:
         image: ${CONTAINER_REGISTRY}/solana-sign-service:${IMAGE_TAG}
         env:
             - name: DATABASE_HOST
-              value: localhost
+              value: "57.151.72.86"
             - name: DATABASE_NAME
-              value: product_local
+              value: dashboard_prod
             - name: DATABASE_PORT
               value: "5432"
             - name: DATABASE_USERNAME
@@ -33,6 +33,12 @@ spec:
               value: NFNDevuQj3z4uMNN86k2PgnbGWdpoApbXwtTMY6B99F
             - name: SOLANA_API_URL
               value: https://mainnet.helius-rpc.com/
+            - name: DEFAULT_REWARD_TOKEN_MINT
+              value: WAYRUy2VkqUCBg49sUSmJ2wYHzWpVjokZfQiGzdrAV3
+            - name: DEFAULT_REWARD_SYSTEM_PROGRAM_ID
+              value: EqeqjHyJTsmnVFCs3rnUEKSgvYBtjXa5ujJueiexWLHp
+            - name: DEFAULT_AIRDROPS_PROGRAM_ID
+              value: Ba6v1vbbHJXKdWKtKvC5ENyrNfT2mLodJv7KQsFyEgEh
             - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:

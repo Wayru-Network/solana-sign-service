@@ -1,7 +1,7 @@
 kind: Ingress
 apiVersion: networking.k8s.io/v1
 metadata:
-  name: solana-sin-service-ingress
+  name: solana-sign-service-ingress
   namespace: default
   uid: 8d4517d0-30ed-4647-91b9-38145eee0eb3
   resourceVersion: '402399'
@@ -40,7 +40,7 @@ spec:
   tls:
     - hosts:
         - secrets.wayru.tech
-      secretName: keyvault-solana-sin-service-ingress
+      secretName: keyvault-solana-sign-service-ingress
   rules:
     - host: secrets.wayru.tech
       http:
