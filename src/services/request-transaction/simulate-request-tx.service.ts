@@ -39,7 +39,7 @@ export const simulateClaimWCreditsTransaction = async (
         const userBalance = await connection.getBalance(user);
 
         // create instruction
-        const amount = new BN(convertToTokenAmount(52));
+        const amount = new BN(convertToTokenAmount(1));
         const nonce = new BN(Date.now());
 
         // Use the same account structure as the function that works
