@@ -116,7 +116,11 @@ export const simulateClaimWCreditsTransaction = async (
         }
 
         // simulate transaction using the new method
-        const simulation = await connection.simulateTransaction(transaction);
+        const simulation = await connection.simulateTransaction(transaction, {
+            commitment: 'confirmed',
+            sigVerify: false,
+            replaceRecentBlockhash: true
+        });
 
         if (simulation.value.err) {
             console.log('simulation logs:', simulation.value.logs);
