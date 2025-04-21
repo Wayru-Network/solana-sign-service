@@ -8,7 +8,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROG
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyTransactionSignature, processMessageData } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
-import { validateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
+import { validateAndUpdateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
 import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards } from "../transaction-tracker/transaction-tracker.service";
 
@@ -40,7 +40,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         const { walletOwnerAddress, hostAddress, manufacturerAddress, solanaAssetId, nfnodeType, nonce } = data;
 
         // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
@@ -295,7 +295,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         }
         const { walletOwnerAddress, hostAddress, solanaAssetId, feeToUpdateMetadata, paymentToAddHostToNFnode, solanaWalletAddressAdmin, solanaTreasuryWalletAddress, nonce } = data;
         // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
@@ -407,7 +407,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
         const { walletAddress, solanaAssetId, nonce } = data;
 
         // validate signature status // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
@@ -501,7 +501,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         }
         const { walletAddress, amountToClaim, nonce } = data;
         // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
@@ -586,7 +586,7 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
         }
         const { walletAddress, solanaAssetId, nonce } = data;
         // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
