@@ -38,7 +38,7 @@ spec:
             - name: DEFAULT_REWARD_SYSTEM_PROGRAM_ID
               value: EqeqjHyJTsmnVFCs3rnUEKSgvYBtjXa5ujJueiexWLHp
             - name: DEFAULT_AIRDROPS_PROGRAM_ID
-              value: EA1H9vvVtEUZsWvBu4H6xHwNW4sxdvfD7RCrjMgYNYNc
+              value: 9xQcf54GAkeU8pGPoE7A6twxcBgWjUsARCzBfEXHEq7S
             - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
