@@ -78,6 +78,7 @@ export interface ClaimWCreditsMessage {
     walletAddress: string;
     amountToClaim: number;
     nonce: number;
+    trackerId: number;
 }
 
 export interface DepositTokensMessage {

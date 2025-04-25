@@ -72,7 +72,8 @@ export const withdrawTokensSchema = yup.object().shape({
 
 export const claimWCreditsSchema = yup.object().shape({
   walletAddress: yup.string().required('Wallet address is required'),
-  amountToClaim: yup.number().required('Amount to claim is required').positive('Amount must be positive')
+  amountToClaim: yup.number().required('Amount to claim is required').positive('Amount must be positive'),
+  trackerId: yup.number().required('Tracker ID is required').positive('Tracker ID must be positive')
 });
 
 export const depositTokensSchema = yup.object().shape({

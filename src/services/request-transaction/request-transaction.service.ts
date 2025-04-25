@@ -42,8 +42,6 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
-            // update the status of the transaction
-            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -297,8 +295,6 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
-            // update the status of the transaction
-            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -409,8 +405,6 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
         // validate signature status // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
-            // update the status of the transaction
-            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -499,12 +493,10 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletAddress, amountToClaim, nonce } = data;
+        const { walletAddress, amountToClaim, nonce, trackerId } = data;
         // validate signature status
-        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(trackerId, signature);
         if (!isValidSignature) {
-            // update the status of the transaction
-            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
@@ -543,7 +535,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         const txBase64 = serializedTx.toString("base64");
 
         // update the status of the transaction
-        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+        await updateTransactionTrackerStatus(trackerId, 'request_authorized_by_admin');
 
         return {
             serializedTx: txBase64,
@@ -588,8 +580,6 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
-            // update the status of the transaction
-            await updateTransactionTrackerStatus(nonce, 'request_unauthorized_by_admin');
             return {
                 serializedTx: null,
                 error: true,
