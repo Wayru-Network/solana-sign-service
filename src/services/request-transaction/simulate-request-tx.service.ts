@@ -39,7 +39,7 @@ export const simulateClaimWCreditsTransaction = async (
         const userBalance = await connection.getBalance(user);
 
         // create instruction
-        const amount = new BN(convertToTokenAmount(52));
+        const amount = new BN(convertToTokenAmount(1));
         const nonce = new BN(Date.now());
 
         // Use the same account structure as the function that works
@@ -116,7 +116,11 @@ export const simulateClaimWCreditsTransaction = async (
         }
 
         // simulate transaction using the new method
-        const simulation = await connection.simulateTransaction(transaction);
+        const simulation = await connection.simulateTransaction(transaction, {
+            commitment: 'confirmed',
+            sigVerify: false,
+            replaceRecentBlockhash: true
+        });
 
         if (simulation.value.err) {
             console.log('simulation logs:', simulation.value.logs);
