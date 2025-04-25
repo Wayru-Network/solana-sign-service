@@ -6,6 +6,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
 import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema } from "@validations/request-transaction/request-transaction.validation";
+import nacl from 'tweetnacl';
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -30,7 +31,7 @@ export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nf
             TOKEN_PROGRAM_ID
         );
 
-        // Derivar otras PDAs necesarias
+        // Derive other necessary PDAs
         const [adminAccount] = PublicKey.findProgramAddressSync(
             [Buffer.from("admin_account")],
             program.programId
@@ -129,18 +130,38 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
 export const verifyTransactionSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
     try {
         const transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
-
-        // Rebuild the message from all instructions
+        
+        // Verify the transaction signature
+        const messageBytes = transaction.compileMessage().serialize();
+        const dbAdminPubKey = new PublicKey(ENV.DB_ADMIN_PUBLIC_KEY);
+        
+        // Find the signature corresponding to the admin key
+        const adminSignatureIndex = transaction.signatures.findIndex(
+            sig => sig.publicKey.toString() === ENV.DB_ADMIN_PUBLIC_KEY
+        );
+        
+        if (adminSignatureIndex === -1 || !transaction.signatures[adminSignatureIndex].signature) {
+            return { isValid: false };
+        }
+        
+        // Verify the signature using the tweetnacl library
+        const signatureValid = nacl.sign.detached.verify(
+            messageBytes, 
+            transaction.signatures[adminSignatureIndex].signature!, 
+            dbAdminPubKey.toBytes()
+        );
+        
+        if (!signatureValid) {
+            return { isValid: false };
+        }
+        
+        // If the signature is valid, extract the message
         const message = transaction.instructions
             .slice(1) // Ignore the first instruction (transfer)
             .map(inst => inst.data.toString())
             .join('');
-
-        const isValid = transaction.signatures.some(sig =>
-            sig.publicKey.toString() === ENV.DB_ADMIN_PUBLIC_KEY
-        );
-
-        return { isValid, message };
+            
+        return { isValid: true, message };
     } catch (error) {
         console.error('Error verifying the transaction:', error);
         return { isValid: false, message: undefined };
@@ -149,7 +170,11 @@ export const verifyTransactionSignature = async (serializedTransaction: string):
 
 export const processMessageData = async <T extends MessageType>(type: T, message: string) => {
     try {
-        const data = JSON.parse(message) as PayloadProcessMessageByType[T];
+        // validate that the message is a valid JSON
+        const { data, error } = safeJsonParse<PayloadProcessMessageByType[T]>(message);
+        if (error) {
+            return null;
+        }
 
         // validate schemas
         switch (type) {
@@ -187,4 +212,29 @@ export const getNFNodeTypeRecord = (type: 'don' | 'byod' | 'wayru'): Record<NFNo
         wayru: { wayruHotspot: {} }
     };
     return typeMap[type] as Record<NFNodeTypeEnum, never>
+};
+
+export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: boolean } => {
+    try {
+        // Validate that it is a string
+        if (typeof jsonString !== 'string') {
+            return { data: null, error: true };
+        }
+        
+        // Validate basic JSON format (start and end correctly)
+        const trimmed = jsonString.trim();
+        if (!(
+            (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))
+        )) {
+            return { data: null, error: true };
+        }
+        
+        // Parse the JSON
+        const parsed = JSON.parse(jsonString);
+        return { data: parsed as T, error: false };
+    } catch (error) {
+        console.error('JSON parse error:', error);
+        return { data: null, error: true };
+    }
 };
