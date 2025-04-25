@@ -89,29 +89,66 @@ export const updateTransactionTrackerStatus = async (nonce: number, status: Cifr
     return document as TransactionTracker | null;
 }
 
-export const validateSignatureStatus = async (nonce: number, signature: string) => {
-    const documents = await pool.query(
-        `SELECT * FROM transaction_trackers WHERE id = $1 AND cifraded_signature = $2 AND cifraded_signature_status = $3`,
-        [nonce, signature, 'requesting_admin_authorization']
-    );
-    const document = documents.rows.length > 0 ? documents.rows[0] : null;
-    if (!document) {
-        return {
-            isValid: false,
-            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
-        }
-    }
-    // validate if the document is older than 30 seconds
-    const isOlderThan30Seconds = moment(document?.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'));
-    if (isOlderThan30Seconds) {
-        return {
-            isValid: false,
-            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE
-        }
-    }
+export const validateAndUpdateSignatureStatus = async (nonce: number, signature: string) => {
+    // Start transaction
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
 
-    return {
-        isValid: true,
-        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE
+        // Validate with SELECT FOR UPDATE to lock the row
+        const result = await client.query(
+            `SELECT * FROM transaction_trackers 
+             WHERE id = $1 AND cifraded_signature = $2 AND cifraded_signature_status = $3
+             FOR UPDATE`,
+            [nonce, signature, 'requesting_admin_authorization']
+        );
+
+        if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return { 
+                isValid: false, 
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE,
+                message: 'Transaction not found'
+            };
+        }
+
+        const document = result.rows[0];
+
+        // Verify expiration
+        if (moment(document.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'))) {
+            // update the status of the transaction
+            await updateTransactionTrackerStatus(nonce, 'request_expired');
+            return { 
+                isValid: false, 
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE,
+                message: 'Transaction expired'
+            };
+        }
+
+        // Update status
+        await client.query(
+            `UPDATE transaction_trackers 
+             SET cifraded_signature_status = $1 
+             WHERE id = $2`,
+            ['request_authorized_by_admin', nonce]
+        );
+
+        await client.query('COMMIT');
+        return { 
+            isValid: true, 
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
+            message: 'Transaction authorized by admin'
+        };
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error validating signature status:', error);
+        return { 
+            isValid: false, 
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
+            message: 'Error validating signature status'
+        };
+    } finally {
+        client.release();
     }
-}
+};
