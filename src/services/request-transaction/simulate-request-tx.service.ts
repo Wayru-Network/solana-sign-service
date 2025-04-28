@@ -1,6 +1,6 @@
 import { LAMPORTS_PER_SOL, PublicKey, VersionedTransaction, TransactionMessage } from "@solana/web3.js";
 import { BN } from "bn.js";
-import { getAirdropsProgram, getSolanaConnection, convertToTokenAmount, getRewardSystemProgram, getUserNFTTokenAccount, getAdminKeypair } from "../solana/solana.service";
+import { getAirdropsProgram, convertToTokenAmount, getRewardSystemProgram, getUserNFTTokenAccount, getAdminKeypair } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { } from "@interfaces/request-transaction/request-transaction.interface";
@@ -11,13 +11,14 @@ import { SystemProgram } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { SimulateInitNfnodeParams, SimulationResult } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
 import { getNFNodeTypeRecord } from "@helpers/request-transaction/request-transaction.helper";
+import { getSolanaConnection } from "@services/solana/solana.connection";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
 ): Promise<SimulationResult> => {
     try {
         const program = await getAirdropsProgram();
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
 
         // validate wallet address
@@ -171,7 +172,7 @@ export const simulateInitializeNfnodeTransaction = async (
     }: SimulateInitNfnodeParams): Promise<SimulationResult> => {
     try {
         const program = await getRewardSystemProgram();
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const tokenMint = await getRewardTokenMint();
 
         // Initialize public keys

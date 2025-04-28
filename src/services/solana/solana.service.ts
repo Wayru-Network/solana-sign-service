@@ -7,6 +7,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { AirdropsProgram } from "@interfaces/airdrops-program/airdrops_program";
 import { getAirdropsProgramId, getRewardSystemProgramId } from "@helpers/solana/solana.helpers";
+import { getSolanaConnection } from "./solana.connection";
 
 export const getRewardSystemProgram = async () => {
   try {
@@ -17,7 +18,7 @@ export const getRewardSystemProgram = async () => {
 
     const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY)));
     // prepare connection
-    const connection = new anchor.web3.Connection(SOLANA_API_URL);
+    const connection = getSolanaConnection()
     const provider = new anchor.AnchorProvider(
       connection,
       new anchor.Wallet(adminKeypair as unknown as anchor.web3.Keypair), // Type cast to anchor's Keypair
@@ -64,11 +65,6 @@ export const getUserNFTTokenAccount = async (
   }
 };
 
-export const getSolanaConnection = async () => {
-  const connection = new Connection(SOLANA_API_URL, "confirmed");
-  return connection;
-};
-
 export const convertToTokenAmount = (amount: number, decimals: number = 6) => {
   return Math.round(amount * Math.pow(10, decimals));
 };
@@ -82,7 +78,7 @@ export const getAirdropsProgram = async () => {
 
     const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY)));
     // prepare connection
-    const connection = new anchor.web3.Connection(SOLANA_API_URL);
+    const connection = getSolanaConnection()
     const provider = new anchor.AnchorProvider(
       connection,
       new anchor.Wallet(adminKeypair as unknown as anchor.web3.Keypair), // Type cast to anchor's Keypair
