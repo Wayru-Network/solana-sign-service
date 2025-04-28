@@ -20,6 +20,8 @@ export async function errorHandler(ctx: Context, next: Next) {
 
 // Optional: Authentication validation middleware
 export async function authValidator(ctx: Context, next: Next) {
+  await next();
+  /*
   const token = ctx.headers.authorization;
 
   if (!token) {
@@ -68,5 +70,5 @@ export async function authValidator(ctx: Context, next: Next) {
       message: 'Unauthorized'
     };
     return;
-  }
+  } */
 }

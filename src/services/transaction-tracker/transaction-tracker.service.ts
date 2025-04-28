@@ -1,4 +1,4 @@
-import pool from "@/config/db";
+import db from "@/config/db";
 import { REQUEST_TRANSACTION_EXPIRATION_TIME } from "@constants/request-transaction";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { CifradedSignatureStatus, TransactionTracker, VerifySignatureStatusToClaim } from "@interfaces/request-transaction/transaction-tracker";
@@ -10,7 +10,7 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
     // 1: signature is equal to the signature in the database
     // 2: document status is equal to claiming
     // 3: all rewardsId are linked to the document
-    const signatureUsed = await pool.query(
+    const signatureUsed = await db.query(
         `SELECT tt.*,
             ARRAY(
                 SELECT rewards_per_epoch_id::text 
@@ -24,7 +24,7 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
          AND tt.transaction_type = $4`,
         [signature, nonce, 'requesting_admin_authorization', 'claim_rewards']
     );
-    const document = signatureUsed.rows.length > 0 ? signatureUsed.rows[0] : null;
+    const document = signatureUsed?.rows?.length > 0 ? signatureUsed.rows[0] : null
     if (!document) {
         return {
             isValidStatus: false,
@@ -53,7 +53,7 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
 
     // validations for minerId:
     //1: find rewards_per_epoches that matches the minerId and has the status ready-for-claim
-    const rewardsPerEpoch = await pool.query(
+    const rewardsPerEpoch = await db.query(
         `SELECT rpe.* 
          FROM rewards_per_epoches rpe
          INNER JOIN rewards_per_epoches_nfnode_links rpel 
@@ -81,7 +81,7 @@ export const updateTransactionTrackerStatus = async (nonce: number, status: Cifr
     if (!nonce) {
         return null;
     }
-    const documentQuery = await pool.query(
+    const documentQuery = await db.query(
         `UPDATE transaction_trackers SET cifraded_signature_status = $1 WHERE id = $2 RETURNING *`,
         [status, nonce]
     );
@@ -91,12 +91,11 @@ export const updateTransactionTrackerStatus = async (nonce: number, status: Cifr
 
 export const validateAndUpdateSignatureStatus = async (nonce: number, signature: string) => {
     // Start transaction
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
+        await db.query('BEGIN');
 
         // Validate with SELECT FOR UPDATE to lock the row
-        const result = await client.query(
+        const result = await db.query(
             `SELECT * FROM transaction_trackers 
              WHERE id = $1 AND cifraded_signature = $2 AND cifraded_signature_status = $3
              FOR UPDATE`,
@@ -104,7 +103,7 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         );
 
         if (result.rows.length === 0) {
-            await client.query('ROLLBACK');
+            await db.query('ROLLBACK');
             return { 
                 isValid: false, 
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE,
@@ -126,14 +125,14 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         }
 
         // Update status
-        await client.query(
+        await db.query(
             `UPDATE transaction_trackers 
              SET cifraded_signature_status = $1 
              WHERE id = $2`,
             ['request_authorized_by_admin', nonce]
         );
 
-        await client.query('COMMIT');
+        await db.query('COMMIT');
         return { 
             isValid: true, 
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
@@ -141,14 +140,12 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         };
 
     } catch (error) {
-        await client.query('ROLLBACK');
+        await db.query('ROLLBACK');
         console.error('Error validating signature status:', error);
         return { 
             isValid: false, 
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
             message: 'Error validating signature status'
         };
-    } finally {
-        client.release();
     }
 };
