@@ -61,7 +61,8 @@ export const updateHostSchema = yup.object().shape({
   feeToUpdateMetadata: yup.number().required('Fee to update metadata is required').positive('Fee must be positive'),
   paymentToAddHostToNFnode: yup.number().required('Payment to add host to NFNode is required').positive('Payment must be positive'),
   solanaWalletAddressAdmin: yup.string().required('Solana wallet address admin is required'),
-  solanaTreasuryWalletAddress: yup.string().required('Solana treasury wallet address is required')
+  solanaTreasuryWalletAddress: yup.string().required('Solana treasury wallet address is required'),
+  hostShare: yup.number().required('Host share is required').positive('Host share must be positive')
 });
 
 export const withdrawTokensSchema = yup.object().shape({
