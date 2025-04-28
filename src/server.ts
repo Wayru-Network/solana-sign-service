@@ -31,8 +31,14 @@ app.use(router.routes());
 app.use(router.allowedMethods());
 
 // Global error handling
-app.on('error', (err, ctx) => {
+app.on('error', async (err, ctx) => {
   console.error('Server Error:', err);
+  
+  // Check if it's a database connection error
+  if (err.message.includes('Connection terminated unexpectedly')) {
+    console.log('Database connection terminated. Attempting to reconnect...');
+    // The DatabasePool class will handle reconnection automatically
+  }
 });
 
 // Initialize server
