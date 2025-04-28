@@ -291,7 +291,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletOwnerAddress, hostAddress, solanaAssetId, feeToUpdateMetadata, paymentToAddHostToNFnode, solanaWalletAddressAdmin, solanaTreasuryWalletAddress, nonce } = data;
+        const { walletOwnerAddress, hostAddress, solanaAssetId, feeToUpdateMetadata, paymentToAddHostToNFnode, solanaWalletAddressAdmin, solanaTreasuryWalletAddress, nonce, hostShare } = data;
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
@@ -309,7 +309,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         const nftMint = new PublicKey(solanaAssetId)
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const hostWalletAddress = new PublicKey(hostAddress)
-        const bnNonce = new BN(nonce)
+        const bnHostShare = new BN(hostShare)
         const userNFTTokenAccount = await getAssociatedTokenAddress(
             nftMint,
             ownerAddress,
@@ -336,7 +336,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
 
         // create the tx for the user
         const updateNfnodeIx = await program.methods
-            .updateNfnode(bnNonce)
+            .updateNfnode(bnHostShare)
             .accounts({
                 userAdmin: adminKeypair.publicKey,
                 user: ownerAddress,
