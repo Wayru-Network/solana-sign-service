@@ -1,7 +1,7 @@
 import { NFNodeTypeEnum, RequestTransactionResponse } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
-import { convertToTokenAmount, getAirdropsProgram, getRewardSystemProgram, getSolanaConnection, getUserNFTTokenAccount } from "../solana/solana.service";
+import { convertToTokenAmount, getAirdropsProgram, getRewardSystemProgram, getUserNFTTokenAccount } from "../solana/solana.service";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -11,6 +11,7 @@ import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateAndUpdateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
 import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards } from "../transaction-tracker/transaction-tracker.service";
+import { getSolanaConnection } from "@services/solana/solana.connection";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -112,7 +113,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             .transaction()
 
         // get the latest blockhash
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         tx.feePayer = user;  // set the fee payer
 
@@ -224,7 +225,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         }
 
         // create a transaction
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         let tx = new anchor.web3.Transaction();
         tx.add(ix);
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
@@ -303,7 +304,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
         }
 
         // prepare transaction parameters 
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const program = await getRewardSystemProgram()
         const ownerAddress = new PublicKey(walletOwnerAddress)
         const nftMint = new PublicKey(solanaAssetId)
@@ -412,7 +413,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
             };
         }
 
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const program = await getRewardSystemProgram();
         const user = new PublicKey(walletAddress);
         const nftMint = new PublicKey(solanaAssetId);
@@ -508,7 +509,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         const program = await getAirdropsProgram();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletAddress); // owner of the NFT
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const rewardTokenMint = await getRewardTokenMint();
         // amount to claim
         const amount = new BN(convertToTokenAmount(amountToClaim));
@@ -586,7 +587,7 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
                 code: codeSignature
             };
         }
-        const connection = await getSolanaConnection();
+        const connection = getSolanaConnection();
         const program = await getRewardSystemProgram();
         const user = new PublicKey(walletAddress);
         const nftMint = new PublicKey(solanaAssetId);
