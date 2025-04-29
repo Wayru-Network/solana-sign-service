@@ -225,6 +225,18 @@ export const simulateInitializeNfnodeTransaction = async (
                     true
                 );
 
+                // Check if the userTokenAccount exists
+                const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
+                const userTokenAccountRent = !userTokenAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
+
+                // Check if the tokenStorageAccount exists
+                const tokenStorageAccountInfo = await connection.getAccountInfo(tokenStorageAccount);
+                const tokenStorageAccountRent = !tokenStorageAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
+
                 // Add initialize nfnode instruction
                 const accounts = {
                     userAdmin: adminKeypair.publicKey,
@@ -266,7 +278,7 @@ export const simulateInitializeNfnodeTransaction = async (
                 // Get user's current balance
                 const userBalance = await connection.getBalance(user);
                 
-                // Calculate rent exempt
+                // Calculate rent exempt for nfnode entry
                 const nfnodeEntryRent = await connection.getMinimumBalanceForRentExemption(165);
 
                 // Get transaction fee
@@ -275,7 +287,13 @@ export const simulateInitializeNfnodeTransaction = async (
                     throw new Error('Failed to get fee for message');
                 }
                 const feeInLamports = transactionFee.value || 0;
-                const totalRequired = nfnodeEntryRent + transactionFee.value;
+
+                // Sum all required lamports
+                const totalRequired =
+                    nfnodeEntryRent +
+                    userTokenAccountRent +
+                    tokenStorageAccountRent +
+                    feeInLamports;
 
                 // Simulate transaction
                 const simulation = await connection.simulateTransaction(transaction);
@@ -285,7 +303,7 @@ export const simulateInitializeNfnodeTransaction = async (
                     return {
                         success: false,
                         feeInLamports: feeInLamports,
-                        feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                        feeInSol: totalRequired / LAMPORTS_PER_SOL,
                         error: JSON.stringify(simulation.value.err),
                         details: {
                             hasEnoughBalance: userBalance >= totalRequired,
@@ -295,6 +313,8 @@ export const simulateInitializeNfnodeTransaction = async (
                             breakdown: {
                                 transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
                                 nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL,
+                                tokenStorageAccountRent: tokenStorageAccountRent / LAMPORTS_PER_SOL,
                             }
                         }
                     };
@@ -303,7 +323,7 @@ export const simulateInitializeNfnodeTransaction = async (
                 return {
                     success: true,
                     feeInLamports: feeInLamports,
-                    feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                    feeInSol: totalRequired / LAMPORTS_PER_SOL,
                     details: {
                         hasEnoughBalance: userBalance >= totalRequired,
                         userBalance: userBalance / LAMPORTS_PER_SOL,
@@ -312,6 +332,8 @@ export const simulateInitializeNfnodeTransaction = async (
                         breakdown: {
                             transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
                             nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                            userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL,
+                            tokenStorageAccountRent: tokenStorageAccountRent / LAMPORTS_PER_SOL,
                         }
                     }
                 };
