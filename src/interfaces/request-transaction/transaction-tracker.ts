@@ -22,4 +22,6 @@ export interface TransactionTracker {
     tx_hash: string
     cifraded_signature: string
     rewards_per_epoches: number[]
+    created_at: Date
+    updated_at: Date
 }

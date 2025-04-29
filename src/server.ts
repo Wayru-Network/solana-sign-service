@@ -7,6 +7,8 @@ import  router from "@routes/api.routes";
 import { ENV } from "@config/env/env";
 import cors from '@koa/cors';
 import { PRODUCTION_ORIGINS } from "@constants/api";
+import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
+import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 
 
 const app = new Koa();
@@ -38,6 +40,9 @@ app.on('error', async (err, ctx) => {
   if (err.message.includes('Connection terminated unexpectedly')) {
     console.log('Database connection terminated. Attempting to reconnect...');
     // The DatabasePool class will handle reconnection automatically
+    // shout down programPaused
+    RewardSystemManager.cleanup();
+    AirdropsSystemManager.cleanup();
   }
 });
 
