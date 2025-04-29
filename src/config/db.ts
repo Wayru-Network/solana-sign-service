@@ -1,67 +1,127 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { ENV } from '@/config/env/env';
 
-class DatabasePool {
-  private static instance: Pool | null = null;
-  private static retryCount = 0;
-  private static readonly MAX_RETRIES = 5;
-  private static readonly RETRY_INTERVAL = 5000; // 5 seconds
+class DatabaseConnection {
+  private static instance: DatabaseConnection | null = null;
+  private pool: Pool;
+  private client: PoolClient | null = null;
+  private connecting: boolean = false;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
 
-  public static getInstance(): Pool {
-    if (!DatabasePool.instance) {
-      DatabasePool.instance = new Pool({
-        host: ENV.DATABASE_HOST,
-        port: parseInt(ENV.DATABASE_PORT || '5432'),
-        database: ENV.DATABASE_NAME,
-        user: ENV.DATABASE_USERNAME,
-        password: ENV.DATABASE_PASSWORD,
-        ssl: ENV.DATABASE_SSL == true,
-        // Add connection pool settings
-        max: 20, // maximum number of clients
-        idleTimeoutMillis: 30000, // how long a client is allowed to remain idle before being closed
-        connectionTimeoutMillis: 2000, // how long to wait before timing out when connecting a new client
-      });
+  private constructor() {
+    this.pool = new Pool({
+      host: ENV.DATABASE_HOST,
+      port: parseInt(ENV.DATABASE_PORT || '5432'),
+      database: ENV.DATABASE_NAME,
+      user: ENV.DATABASE_USERNAME,
+      password: ENV.DATABASE_PASSWORD,
+      ssl: ENV.DATABASE_SSL == true,
+      // Connection settings
+      connectionTimeoutMillis: 10000, // 10 seconds
+      max: 20,
+      idleTimeoutMillis: 30000
+    });
 
-      // Handle pool errors
-      DatabasePool.instance.on('error', (err) => {
-        console.error('Unexpected error on idle client', err);
-        DatabasePool.handleError(err);
-      });
-    }
-    return DatabasePool.instance;
+    this.setupPoolErrorHandler();
+    this.connect().catch(console.error);
   }
 
-  private static async handleError(error: Error): Promise<void> {
-    console.error('Database connection error:', error);
+  private setupPoolErrorHandler() {
+    this.pool.on('error', (err) => {
+      console.error('Unexpected pool error', err);
+      this.scheduleReconnect();
+    });
+  }
+
+  private async connect() {
+    if (this.connecting) return;
     
-    if (DatabasePool.retryCount < DatabasePool.MAX_RETRIES) {
-      DatabasePool.retryCount++;
-      console.log(`Retrying connection... Attempt ${DatabasePool.retryCount} of ${DatabasePool.MAX_RETRIES}`);
+    try {
+      this.connecting = true;
       
-      // Close the current pool
-      if (DatabasePool.instance) {
-        await DatabasePool.instance.end();
-        DatabasePool.instance = null;
+      // Close existing client if any
+      if (this.client) {
+        try {
+          await this.client.release();
+        } catch (e) {
+          console.error('Error releasing client:', e);
+        }
+        this.client = null;
       }
 
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, DatabasePool.RETRY_INTERVAL));
+      // Get new client
+      this.client = await this.pool.connect();
       
-      // Try to get a new instance
-      DatabasePool.getInstance();
-    } else {
-      console.error('Max retry attempts reached. Please check database configuration and connectivity.');
-      process.exit(1); // Exit the process if we can't establish a connection after max retries
+      this.client.on('error', (err) => {
+        console.error('Client error:', err);
+        this.scheduleReconnect();
+      });
+
+      console.log('Successfully connected to database');
+      
+    } catch (error) {
+      console.error('Failed to connect to database:', error);
+      this.scheduleReconnect();
+    } finally {
+      this.connecting = false;
     }
   }
 
-  public static async end(): Promise<void> {
-    if (DatabasePool.instance) {
-      await DatabasePool.instance.end();
-      DatabasePool.instance = null;
+  private scheduleReconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
     }
+
+    this.reconnectTimeout = setTimeout(() => {
+      console.log('Attempting to reconnect to database...');
+      this.connect().catch(console.error);
+    }, 5000); // Wait 5 seconds before reconnecting
+  }
+
+  public static getInstance(): DatabaseConnection {
+    if (!DatabaseConnection.instance) {
+      DatabaseConnection.instance = new DatabaseConnection();
+    }
+    return DatabaseConnection.instance;
+  }
+
+  public async query<T extends QueryResultRow>(text: string, params?: any[]): Promise<QueryResult<T>> {
+    if (!this.client) {
+      await this.connect();
+    }
+
+    try {
+      const result = await this.client!.query(text, params);
+      return result;
+    } catch (error) {
+      if (this.isConnectionError(error)) {
+        console.error('Connection error during query, attempting to reconnect:', error);
+        await this.connect();
+        // Retry query once after reconnecting
+        const result = await this.client!.query(text, params);
+        return result;
+      }
+      throw error;
+    }
+  }
+
+  private isConnectionError(error: any): boolean {
+    return error.message.includes('Connection terminated') ||
+           error.message.includes('timeout exceeded') ||
+           error.message.includes('Connection refused');
+  }
+
+  public async end() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    if (this.client) {
+      await this.client.release();
+    }
+    await this.pool.end();
   }
 }
 
-const pool = DatabasePool.getInstance();
-export default pool;
+// Export a singleton instance
+export const db = DatabaseConnection.getInstance();
+export default db;

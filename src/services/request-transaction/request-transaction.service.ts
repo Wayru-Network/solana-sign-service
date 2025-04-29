@@ -1,7 +1,7 @@
 import { NFNodeTypeEnum, RequestTransactionResponse } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
-import { convertToTokenAmount, getAirdropsProgram, getRewardSystemProgram, getUserNFTTokenAccount } from "../solana/solana.service";
+import { convertToTokenAmount, getUserNFTTokenAccount } from "../solana/solana.service";
 import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -12,6 +12,8 @@ import { validateAndUpdateSignatureStatus } from "../transaction-tracker/transac
 import { ENV } from "@config/env/env";
 import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards } from "../transaction-tracker/transaction-tracker.service";
 import { getSolanaConnection } from "@services/solana/solana.connection";
+import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
+import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -52,7 +54,7 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 
         // prepare transaction parameters
         const hostShare = new BN(0); // host share of the NFT is 0
-        const program = await getRewardSystemProgram();
+        const program = await RewardSystemManager.getInstance();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletOwnerAddress); // owner of the NFT
         const host = new PublicKey(hostAddress); // host of the NFT
@@ -192,7 +194,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
 
         // prepare transaction parameters
         const rewardTokenMint = await getRewardTokenMint();
-        const program = await getRewardSystemProgram();
+        const program = await RewardSystemManager.getInstance();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletAddress);
         const mint = new PublicKey(rewardTokenMint)
@@ -305,7 +307,7 @@ export const requestTransactionToUpdateHost = async (signature: string): Request
 
         // prepare transaction parameters 
         const connection = getSolanaConnection();
-        const program = await getRewardSystemProgram()
+        const program = await RewardSystemManager.getInstance();
         const ownerAddress = new PublicKey(walletOwnerAddress)
         const nftMint = new PublicKey(solanaAssetId)
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
@@ -414,7 +416,7 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
         }
 
         const connection = getSolanaConnection();
-        const program = await getRewardSystemProgram();
+        const program = await RewardSystemManager.getInstance();
         const user = new PublicKey(walletAddress);
         const nftMint = new PublicKey(solanaAssetId);
         // get the user nft token account
@@ -506,7 +508,7 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         }
 
         // get program 
-        const program = await getAirdropsProgram();
+        const program = await AirdropsSystemManager.getInstance();
         const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
         const user = new PublicKey(walletAddress); // owner of the NFT
         const connection = getSolanaConnection();
@@ -588,7 +590,7 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
             };
         }
         const connection = getSolanaConnection();
-        const program = await getRewardSystemProgram();
+        const program = await RewardSystemManager.getInstance();
         const user = new PublicKey(walletAddress);
         const nftMint = new PublicKey(solanaAssetId);
         const userNFTTokenAccount = await getAssociatedTokenAddress(
