@@ -92,21 +92,21 @@ export const simulateClaimWCreditsTransaction = async (
                     user
                 );
                 const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
-                const tokenAccountRent = !userTokenAccountInfo ?
-                    await connection.getMinimumBalanceForRentExemption(165) : // standar size of the token account
-                    0;
+                const userTokenAccountRent = !userTokenAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
 
                 // calculate the total required balance
                 const requiredBalance = feeInLamports + // transaction fee
                     rentExemptClaimEntry + // rent for claim entry
-                    tokenAccountRent; // rent for token account if necessary
+                    userTokenAccountRent; // rent for token account if necessary
 
                 const hasEnoughBalance = userBalance >= requiredBalance;
 
                 if (!hasEnoughBalance) {
                     return {
                         feeInLamports,
-                        feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                        feeInSol: requiredBalance / LAMPORTS_PER_SOL,
                         success: false,
                         error: "Insufficient balance for transaction and account creation",
                         code: SIMULATE_REQUEST_TX_CODES.INSUFFICIENT_BALANCE,
@@ -117,7 +117,7 @@ export const simulateClaimWCreditsTransaction = async (
                             breakdown: {
                                 transactionFee: feeInLamports / LAMPORTS_PER_SOL,
                                 claimEntryRent: rentExemptClaimEntry / LAMPORTS_PER_SOL,
-                                tokenAccountRent: tokenAccountRent / LAMPORTS_PER_SOL
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
                             }
                         }
                     };
@@ -134,7 +134,7 @@ export const simulateClaimWCreditsTransaction = async (
                     console.log('simulation logs:', simulation.value.logs);
                     return {
                         feeInLamports,
-                        feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                        feeInSol: requiredBalance / LAMPORTS_PER_SOL,
                         success: false,
                         error: JSON.stringify(simulation.value.err),
                         code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
@@ -142,21 +142,31 @@ export const simulateClaimWCreditsTransaction = async (
                             hasEnoughBalance,
                             userBalance: userBalance / LAMPORTS_PER_SOL,
                             requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
-                            rentExemptBalance: rentExemptClaimEntry / LAMPORTS_PER_SOL
+                            rentExemptBalance: rentExemptClaimEntry / LAMPORTS_PER_SOL,
+                            breakdown: {
+                                transactionFee: feeInLamports / LAMPORTS_PER_SOL,
+                                claimEntryRent: rentExemptClaimEntry / LAMPORTS_PER_SOL,
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
+                            }
                         }
                     };
                 }
 
                 return {
                     feeInLamports,
-                    feeInSol: feeInLamports / LAMPORTS_PER_SOL,
+                    feeInSol: requiredBalance / LAMPORTS_PER_SOL,
                     success: true,
                     code: SIMULATE_REQUEST_TX_CODES.SUCCESS,
                     details: {
                         hasEnoughBalance,
                         userBalance: userBalance / LAMPORTS_PER_SOL,
                         requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
-                        rentExemptBalance: rentExemptClaimEntry / LAMPORTS_PER_SOL
+                        rentExemptBalance: rentExemptClaimEntry / LAMPORTS_PER_SOL,
+                        breakdown: {
+                            transactionFee: feeInLamports / LAMPORTS_PER_SOL,
+                            claimEntryRent: rentExemptClaimEntry / LAMPORTS_PER_SOL,
+                            userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
+                        }
                     }
                 };
 
