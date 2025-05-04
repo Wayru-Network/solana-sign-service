@@ -38,4 +38,5 @@ export const SIMULATE_REQUEST_TX_CODES = {
     SIMULATION_FAILED: simulateErrornIndex + '003',
     SUCCESS: simulateErrornIndex + '004',
     UNKNOWN_ERROR: simulateErrornIndex + '005',
+    PROGRAM_DOES_NOT_HAVE_ENOUGH_REWARD_TOKENS: simulateErrornIndex + '006',
 }

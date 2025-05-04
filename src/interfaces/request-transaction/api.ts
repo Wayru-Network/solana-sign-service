@@ -9,8 +9,16 @@ export interface WalletAddressBody {
     walletAddress: string;
 }
 
+export interface SimulateClaimRewardParams {
+    walletAddress: string;
+    amountToClaim: number;
+    nftMintAddress: string;
+    claimerType: 'owner' | 'other';
+}
 export interface CtxSignatureInside extends CtxBase<SignatureInsideBody> {}
 
 export interface CtxWalletAddress extends CtxBase<WalletAddressBody> {}
 
 export interface CtxSimulateInitNfnode extends CtxBase<SimulateInitNfnodeParams> {}
+
+export interface CtxSimulateClaimReward extends CtxBase<SimulateClaimRewardParams> {}
