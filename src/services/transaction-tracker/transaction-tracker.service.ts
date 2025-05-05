@@ -34,7 +34,9 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
 
     // into tx context has to be the amount to claim, the name is amountToClaim, and has to be equal to the amount in the document
     const amountToClaimDocument = document?.tx_context?.amountToClaim as number;
-    if (!amountToClaimDocument || !amountToClaim || Number(amountToClaimDocument) !== Number(amountToClaim)) {
+    const formattedAmountToClaimDocument = Number(amountToClaimDocument).toFixed(2);
+    const formattedAmountToClaim = Number(amountToClaim).toFixed(2);
+    if (!amountToClaimDocument || !amountToClaim || Number(formattedAmountToClaimDocument) !== Number(formattedAmountToClaim)) {
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_AMOUNT_NOT_MATCH_ERROR_CODE
