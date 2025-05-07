@@ -17,6 +17,7 @@ export class SimulateRequestTxController {
     static async simulateClaimReward(ctx: CtxSimulateClaimReward) {
         const { walletAddress, amountToClaim, nftMintAddress, claimerType } = ctx?.request?.body as SimulateClaimRewardParams;
         const result = await simulateClaimRewardTransaction(walletAddress, amountToClaim, nftMintAddress, claimerType);
+        console.log(result);
         return ctx.body = result
     }
 }

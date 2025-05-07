@@ -1,3 +1,4 @@
+import { ENV } from "@config/env/env";
 
 interface CacheEntry<T> {
   data: T;
@@ -72,7 +73,7 @@ class SimulationCache {
     const key = this.generateKey(params);
     const cached = this.cache.get(key);
 
-    if (cached && this.isValid(cached)) {
+    if (cached && this.isValid(cached) && !ENV.DISABLED_SIMULATION_CACHE) {
       console.log('Simulation found in cache:', key);
       return cached.data as T;
     }
