@@ -179,7 +179,8 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
             rewardsId,
             minerId,
             claimerType,
-            nonce
+            nonce,
+            amountToClaim: totalAmount
         });
         if (!isValidStatus) {
             // update the status of the transaction

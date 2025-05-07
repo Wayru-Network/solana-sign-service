@@ -1,6 +1,6 @@
 import Router from 'koa-router';
 import { Route } from '@/interfaces/api/api';
-import { CtxSimulateInitNfnode, CtxWalletAddress } from '@/interfaces/request-transaction/api';
+import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxWalletAddress } from '@/interfaces/request-transaction/api';
 import { SimulateRequestTxController } from '@/controllers/request-transaction/simulate-request-tx.controller';
 const router = new Router();
 
@@ -17,6 +17,14 @@ const routes: Route[] = [
     path: '/simulate-initialize-nfnode',
     handler: async (ctx: CtxSimulateInitNfnode) => {
       await SimulateRequestTxController.simulateInitializeNfnode(ctx);
+    }
+  }
+  ,
+  {
+    method: 'post',
+    path: '/simulate-claim-reward',
+    handler: async (ctx: CtxSimulateClaimReward) => {
+      await SimulateRequestTxController.simulateClaimReward(ctx);
     }
   }
 ];

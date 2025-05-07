@@ -16,7 +16,7 @@ class SimulationCache {
 
   private constructor() {
     this.cache = new Map();
-    this.ttl = 60 * 1000; // 1 minute in milliseconds
+    this.ttl = 30 * 1000; // 30 seconds in milliseconds
     
     // Run cleanup every minute
     this.cleanupInterval = setInterval(() => {
