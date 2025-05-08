@@ -4,7 +4,7 @@ import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/req
 import { CifradedSignatureStatus, TransactionTracker, VerifySignatureStatusToClaim } from "@interfaces/request-transaction/transaction-tracker";
 import moment from "moment";
 
-export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, rewardsId, minerId, claimerType }: VerifySignatureStatusToClaim) => {
+export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, rewardsId, minerId, claimerType, amountToClaim }: VerifySignatureStatusToClaim) => {
 
     // validations for signature and rewards id:
     // 1: signature is equal to the signature in the database
@@ -32,6 +32,16 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
         }
     }
 
+    // into tx context has to be the amount to claim, the name is amountToClaim, and has to be equal to the amount in the document
+    const amountToClaimDocument = document?.tx_context?.amountToClaim as number;
+    const formattedAmountToClaimDocument = Number(amountToClaimDocument).toFixed(2);
+    const formattedAmountToClaim = Number(amountToClaim).toFixed(2);
+    if (!amountToClaimDocument || !amountToClaim || Number(formattedAmountToClaimDocument) !== Number(formattedAmountToClaim)) {
+        return {
+            isValidStatus: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_AMOUNT_NOT_MATCH_ERROR_CODE
+        }
+    }
     // validate if the document is older than 30 seconds
     const isOlderThan30Seconds = moment(document?.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'));
     if (isOlderThan30Seconds) {
@@ -104,8 +114,8 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
 
         if (result.rows.length === 0) {
             await db.query('ROLLBACK');
-            return { 
-                isValid: false, 
+            return {
+                isValid: false,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE,
                 message: 'Transaction not found'
             };
@@ -117,8 +127,8 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         if (moment(document.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'))) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_expired');
-            return { 
-                isValid: false, 
+            return {
+                isValid: false,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE,
                 message: 'Transaction expired'
             };
@@ -133,8 +143,8 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         );
 
         await db.query('COMMIT');
-        return { 
-            isValid: true, 
+        return {
+            isValid: true,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
             message: 'Transaction authorized by admin'
         };
@@ -142,8 +152,8 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
     } catch (error) {
         await db.query('ROLLBACK');
         console.error('Error validating signature status:', error);
-        return { 
-            isValid: false, 
+        return {
+            isValid: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
             message: 'Error validating signature status'
         };

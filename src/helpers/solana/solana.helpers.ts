@@ -42,3 +42,9 @@ export const getAirdropsProgramId = async () => {
     // remove all spaces
     return id.replace(/\s/g, '');
 }
+
+export const getSolanaPriorityFee = async () => {
+    const key = await getKeyByName('SOLANA_PRIORITY_FEE_TO_CLAIM');
+    const fee = Number(key?.value) || 0.00001;
+    return fee;
+}

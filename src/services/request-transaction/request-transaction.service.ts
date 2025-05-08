@@ -2,8 +2,8 @@ import { NFNodeTypeEnum, RequestTransactionResponse } from "@interfaces/request-
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import { convertToTokenAmount, getUserNFTTokenAccount } from "../solana/solana.service";
-import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
-import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { getKeyPairFromUnit8Array, getSolanaPriorityFee } from "@helpers/solana/solana.helpers";
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, ComputeBudgetProgram } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
 import { prepareAccountsToClaimReward, verifyTransactionSignature, processMessageData } from "@helpers/request-transaction/request-transaction.helper";
@@ -14,6 +14,7 @@ import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards 
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
+import { getKeyByName } from "@services/keys/keys-queries";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -179,7 +180,8 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
             rewardsId,
             minerId,
             claimerType,
-            nonce
+            nonce,
+            amountToClaim: totalAmount
         });
         if (!isValidStatus) {
             // update the status of the transaction
@@ -226,13 +228,23 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 .instruction();
         }
 
-        // create a transaction
+        // Add this near the top of the function
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
+        // Modify the transaction creation
         const connection = getSolanaConnection();
         let tx = new anchor.web3.Transaction();
-        tx.add(ix);
+        tx.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: microLamportsPerComputeUnit,
+            }),
+            ix
+        );
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         tx.feePayer = user;
         tx.partialSign(adminKeypair);
+        
 
         // serialize tx
         const serializedTx = tx.serialize({

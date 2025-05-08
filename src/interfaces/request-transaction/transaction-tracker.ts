@@ -11,6 +11,7 @@ export interface VerifySignatureStatusToClaim {
     rewardsId: number[];
     minerId: number;
     claimerType: ClaimerType;
+    amountToClaim: number;
 }
 
 export interface TransactionTracker {
@@ -24,4 +25,7 @@ export interface TransactionTracker {
     rewards_per_epoches: number[]
     created_at: Date
     updated_at: Date
+    tx_context?: {
+        [key: string]: unknown
+    }
 }
