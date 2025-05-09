@@ -182,12 +182,11 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletAddress, totalAmount, minerId, rewardsId, type: claimerType, solanaAssetId, nonce } = data;
+        const { walletAddress, totalAmount, minerId, type: claimerType, solanaAssetId, nonce } = data;
 
         // first verify the signature status
         const { isValidStatus, code } = await verifyTransactionTrackerToClaimRewards({
             signature,
-            rewardsId,
             minerId,
             claimerType,
             nonce,

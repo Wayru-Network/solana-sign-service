@@ -8,7 +8,6 @@ export type CifradedSignatureStatus = 'requesting_admin_authorization' | 'reques
 export interface VerifySignatureStatusToClaim {
     signature: string;
     nonce: number;
-    rewardsId: number[];
     minerId: number;
     claimerType: ClaimerType;
     amountToClaim: number;
