@@ -89,6 +89,9 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
             true // allowOwnerOffCurve = true para PDAs
         );
         const tokenMint = new PublicKey(rewardTokenMint);
+        // Add priority fee
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
 
         const accounts = {
             userAdmin: adminKeypair.publicKey,
@@ -110,13 +113,20 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
         } as const;
 
         // create a transaction
-        const tx = await program.methods
+        const ix = await program.methods
             .initializeNfnode(hostShare, nfnodeType as Record<NFNodeTypeEnum, never>)
             .accounts(accounts)
             .transaction()
 
         // get the latest blockhash
         const connection = getSolanaConnection();
+        let tx = new anchor.web3.Transaction();
+        tx.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: microLamportsPerComputeUnit,
+            }),
+            ix
+        );
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         tx.feePayer = user;  // set the fee payer
 
@@ -203,6 +213,9 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         const nftMint = new PublicKey(solanaAssetId)
         const amountToClaim = new BN(convertToTokenAmount(totalAmount));
         const bnNonce = new BN(nonce);
+        // Add priority fee
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
 
         // prepare params to claim reward
         const accounts = await prepareAccountsToClaimReward({ program, mint, userWallet: user, nftMint, claimerType, adminKeypair })
@@ -228,9 +241,6 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
                 .instruction();
         }
 
-        // Add this near the top of the function
-        const priorityFeeInSol = await getSolanaPriorityFee();
-        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
 
         // Modify the transaction creation
         const connection = getSolanaConnection();
@@ -244,7 +254,7 @@ export const requestTransactionToClaimReward = async (signature: string): Reques
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         tx.feePayer = user;
         tx.partialSign(adminKeypair);
-        
+
 
         // serialize tx
         const serializedTx = tx.serialize({
@@ -525,6 +535,10 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
         const user = new PublicKey(walletAddress); // owner of the NFT
         const connection = getSolanaConnection();
         const rewardTokenMint = await getRewardTokenMint();
+        // Add priority fee
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
         // amount to claim
         const amount = new BN(convertToTokenAmount(amountToClaim));
         const ix = await program.methods
@@ -537,7 +551,12 @@ export const requestTransactionToClaimWCredits = async (signature: string): Prom
             .instruction();
 
         const tx = new Transaction();
-        tx.add(ix);
+        tx.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: microLamportsPerComputeUnit,
+            }),
+            ix
+        );
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         tx.feePayer = user;
         tx.partialSign(adminKeypair);

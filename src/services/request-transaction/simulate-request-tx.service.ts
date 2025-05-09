@@ -31,7 +31,8 @@ export const simulateClaimWCreditsTransaction = async (
                 const program = await AirdropsSystemManager.getInstance();
                 const connection = getSolanaConnection();
                 const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
-                const priorityFee = await getSolanaPriorityFee();
+                const priorityFeeInSol = await getSolanaPriorityFee();
+
                 // validate wallet address
                 try {
                     new PublicKey(walletAddress); // Ensure the address is valid
@@ -70,13 +71,16 @@ export const simulateClaimWCreditsTransaction = async (
                 console.log('getLatestBlockhash');
                 const { blockhash } = await connection.getLatestBlockhash();
 
+                 // Convert SOL to microLamports per compute unit
+                 const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
                 // create transaction message
                 const messageV0 = new TransactionMessage({
                     payerKey: user,
                     recentBlockhash: blockhash,
                     instructions: [
                         ComputeBudgetProgram.setComputeUnitPrice({
-                            microLamports: Math.floor(priorityFee * LAMPORTS_PER_SOL * 1e6),
+                            microLamports: microLamportsPerComputeUnit,
                         }),
                         ix
                     ],
@@ -218,7 +222,7 @@ export const simulateInitializeNfnodeTransaction = async (
                 const program = await RewardSystemManager.getInstance();
                 const connection = getSolanaConnection();
                 const tokenMint = await getRewardTokenMint();
-                const priorityFee = await getSolanaPriorityFee();
+                const priorityFeeInSol = await getSolanaPriorityFee();
 
                 // Initialize public keys
                 const user = new PublicKey(walletAddress);
@@ -293,6 +297,9 @@ export const simulateInitializeNfnodeTransaction = async (
                 // Get latest blockhash
                 const latestBlockhash = await connection.getLatestBlockhash();
 
+                // Convert SOL to microLamports per compute unit
+                const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
                 // Create TransactionMessage
                 const messageV0 = new TransactionMessage({
                     payerKey: user,
@@ -302,7 +309,7 @@ export const simulateInitializeNfnodeTransaction = async (
                             units: 300_000  // Límite por defecto
                         }),
                         ComputeBudgetProgram.setComputeUnitPrice({
-                            microLamports: Math.floor(priorityFee * 1e15)
+                            microLamports: microLamportsPerComputeUnit
                         }),
                         initializeNfnodeIx
                     ]
@@ -473,25 +480,6 @@ export const simulateClaimRewardTransaction = async (
 
                 // get last blockhash
                 const { blockhash } = await connection.getLatestBlockhash();
-
-                // First, create a transaction without priority fee to simulate
-                const baseMessageV0 = new TransactionMessage({
-                    payerKey: user,
-                    recentBlockhash: blockhash,
-                    instructions: [ix]
-                }).compileToV0Message();
-
-                const simulationTx = new VersionedTransaction(baseMessageV0);
-                simulationTx.sign([adminKeypair]);
-
-                // Simulate to get compute units
-                const simulation = await connection.simulateTransaction(simulationTx, {
-                    sigVerify: false,
-                    replaceRecentBlockhash: true
-                });
-
-                // Get compute units from simulation
-                const computeUnits = simulation.value.unitsConsumed || 0;
 
                 // Convert SOL to microLamports per compute unit
                 const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
