@@ -14,7 +14,6 @@ import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards 
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
-import { getKeyByName } from "@services/keys/keys-queries";
 
 /**
  * Request a transaction to initialize a NFNode
