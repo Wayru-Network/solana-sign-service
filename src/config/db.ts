@@ -17,9 +17,11 @@ class DatabaseConnection {
       password: ENV.DATABASE_PASSWORD,
       ssl: ENV.DATABASE_SSL == true,
       // Connection settings
-      connectionTimeoutMillis: 10000, // 10 seconds
-      max: 20,
-      idleTimeoutMillis: 30000
+      connectionTimeoutMillis: 30000, // Increase to 30 seconds
+      max: 10, // Reduce max connections
+      idleTimeoutMillis: 60000, // Increase idle timeout
+      keepAlive: true, // Add keepAlive
+      keepAliveInitialDelayMillis: 10000 // Add keepAlive initial delay
     });
 
     this.setupPoolErrorHandler();
