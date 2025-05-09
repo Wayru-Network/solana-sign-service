@@ -27,7 +27,6 @@ export const simulateClaimWCreditsTransaction = async (
         { type: 'claim_w_credits', walletAddress },
         async () => {
             try {
-                console.log('simulateClaimWCreditsTransaction');
                 const program = await AirdropsSystemManager.getInstance();
                 const connection = getSolanaConnection();
                 const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
@@ -56,7 +55,6 @@ export const simulateClaimWCreditsTransaction = async (
                 const nonce = new BN(Date.now());
 
                 // Use the same account structure as the function that works
-                console.log('getRewardTokenMint');
                 const rewardTokenMint = await getRewardTokenMint();
                 const ix = await program.methods
                     .claimTokens(amount, nonce)
@@ -68,7 +66,6 @@ export const simulateClaimWCreditsTransaction = async (
                     .instruction();
 
                 // get last blockhash
-                console.log('getLatestBlockhash');
                 const { blockhash } = await connection.getLatestBlockhash();
 
                  // Convert SOL to microLamports per compute unit
@@ -87,7 +84,6 @@ export const simulateClaimWCreditsTransaction = async (
                 }).compileToV0Message();
 
                 // create versioned transaction
-                console.log('createVersionedTransaction');
                 const transaction = new VersionedTransaction(messageV0);
                 transaction.sign([adminKeypair]);
 
@@ -102,7 +98,6 @@ export const simulateClaimWCreditsTransaction = async (
                 const rentExemptClaimEntry = await connection.getMinimumBalanceForRentExemption(CLAIM_ENTRY_SIZE);
 
                 // get rent exempt for the token account if it doesn't exist
-                console.log('getRewardTokenMint');
                 const tokenMint = await getRewardTokenMint();
                 const userTokenAccount = await getAssociatedTokenAddress(
                     new PublicKey(tokenMint),
@@ -120,8 +115,6 @@ export const simulateClaimWCreditsTransaction = async (
                     MINIMUM_REMAINING_SOLANA_BALANCE;
 
                 const hasEnoughBalance = userBalance >= requiredBalance;
-
-                console.log('All async operations completed');
 
                 if (!hasEnoughBalance) {
                     return {
