@@ -4,7 +4,7 @@ import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/req
 import { CifradedSignatureStatus, TransactionTracker, VerifySignatureStatusToClaim } from "@interfaces/request-transaction/transaction-tracker";
 import moment from "moment";
 
-export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, rewardsId, minerId, claimerType, amountToClaim }: VerifySignatureStatusToClaim) => {
+export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce, minerId, claimerType, amountToClaim }: VerifySignatureStatusToClaim) => {
 
     // validations for signature and rewards id:
     // 1: signature is equal to the signature in the database
@@ -48,16 +48,6 @@ export const verifyTransactionTrackerToClaimRewards = async ({ signature, nonce,
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE
-        }
-    }
-    // Verify that all provided rewardsId exist in the linked rewards
-    const linkedRewardsMatch = rewardsId.every(id =>
-        document.linked_rewards?.includes(id.toString())
-    );
-    if (!linkedRewardsMatch) {
-        return {
-            isValidStatus: false,
-            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_REWARDS_ERROR_CODE
         }
     }
 
