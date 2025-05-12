@@ -1,8 +1,8 @@
-import { LAMPORTS_PER_SOL, PublicKey, VersionedTransaction, TransactionMessage } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey, VersionedTransaction, TransactionMessage, ComputeBudgetProgram } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { convertToTokenAmount, getUserNFTTokenAccount, getAdminKeypair } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
-import { getKeyPairFromUnit8Array } from "@helpers/solana/solana.helpers";
+import { getKeyPairFromUnit8Array, getSolanaPriorityFee } from "@helpers/solana/solana.helpers";
 import { } from "@interfaces/request-transaction/request-transaction.interface";
 import { SIMULATE_REQUEST_TX_CODES } from "@errors/request-transaction/request-transaction";
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -15,6 +15,9 @@ import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 import { simulationCache } from '../simulation-cache/simulation-cache.service';
+import { prepareAccountsToClaimReward } from "@helpers/request-transaction/request-transaction.helper";
+import * as anchor from "@coral-xyz/anchor";
+import { MINIMUM_REMAINING_SOLANA_BALANCE } from "@constants/solana/solana.constants";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
@@ -27,6 +30,7 @@ export const simulateClaimWCreditsTransaction = async (
                 const program = await AirdropsSystemManager.getInstance();
                 const connection = getSolanaConnection();
                 const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+                const priorityFeeInSol = await getSolanaPriorityFee();
 
                 // validate wallet address
                 try {
@@ -64,11 +68,19 @@ export const simulateClaimWCreditsTransaction = async (
                 // get last blockhash
                 const { blockhash } = await connection.getLatestBlockhash();
 
+                 // Convert SOL to microLamports per compute unit
+                 const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
                 // create transaction message
                 const messageV0 = new TransactionMessage({
                     payerKey: user,
                     recentBlockhash: blockhash,
-                    instructions: [ix],
+                    instructions: [
+                        ComputeBudgetProgram.setComputeUnitPrice({
+                            microLamports: microLamportsPerComputeUnit,
+                        }),
+                        ix
+                    ],
                 }).compileToV0Message();
 
                 // create versioned transaction
@@ -97,9 +109,10 @@ export const simulateClaimWCreditsTransaction = async (
                     : 0;
 
                 // calculate the total required balance
-                const requiredBalance = feeInLamports + // transaction fee
-                    rentExemptClaimEntry + // rent for claim entry
-                    userTokenAccountRent; // rent for token account if necessary
+                const requiredBalance = feeInLamports +
+                    rentExemptClaimEntry +
+                    userTokenAccountRent +
+                    MINIMUM_REMAINING_SOLANA_BALANCE;
 
                 const hasEnoughBalance = userBalance >= requiredBalance;
 
@@ -108,12 +121,13 @@ export const simulateClaimWCreditsTransaction = async (
                         feeInLamports,
                         feeInSol: requiredBalance / LAMPORTS_PER_SOL,
                         success: false,
-                        error: "Insufficient balance for transaction and account creation",
+                        error: `User must have at least ${MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL} SOL left after the transaction.`,
                         code: SIMULATE_REQUEST_TX_CODES.INSUFFICIENT_BALANCE,
                         details: {
                             hasEnoughBalance,
                             userBalance: userBalance / LAMPORTS_PER_SOL,
                             requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
+                            minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
                             breakdown: {
                                 transactionFee: feeInLamports / LAMPORTS_PER_SOL,
                                 claimEntryRent: rentExemptClaimEntry / LAMPORTS_PER_SOL,
@@ -201,6 +215,7 @@ export const simulateInitializeNfnodeTransaction = async (
                 const program = await RewardSystemManager.getInstance();
                 const connection = getSolanaConnection();
                 const tokenMint = await getRewardTokenMint();
+                const priorityFeeInSol = await getSolanaPriorityFee();
 
                 // Initialize public keys
                 const user = new PublicKey(walletAddress);
@@ -275,11 +290,22 @@ export const simulateInitializeNfnodeTransaction = async (
                 // Get latest blockhash
                 const latestBlockhash = await connection.getLatestBlockhash();
 
+                // Convert SOL to microLamports per compute unit
+                const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
                 // Create TransactionMessage
                 const messageV0 = new TransactionMessage({
                     payerKey: user,
                     recentBlockhash: latestBlockhash.blockhash,
-                    instructions: [initializeNfnodeIx]
+                    instructions: [
+                        ComputeBudgetProgram.setComputeUnitLimit({
+                            units: 300_000  // Límite por defecto
+                        }),
+                        ComputeBudgetProgram.setComputeUnitPrice({
+                            microLamports: microLamportsPerComputeUnit
+                        }),
+                        initializeNfnodeIx
+                    ]
                 }).compileToV0Message();
 
                 // Create VersionedTransaction
@@ -303,7 +329,8 @@ export const simulateInitializeNfnodeTransaction = async (
                     nfnodeEntryRent +
                     userTokenAccountRent +
                     tokenStorageAccountRent +
-                    feeInLamports;
+                    feeInLamports +
+                    MINIMUM_REMAINING_SOLANA_BALANCE;
 
                 // Simulate transaction
                 const simulation = await connection.simulateTransaction(transaction);
@@ -320,6 +347,7 @@ export const simulateInitializeNfnodeTransaction = async (
                             userBalance: userBalance / LAMPORTS_PER_SOL,
                             requiredBalance: totalRequired / LAMPORTS_PER_SOL,
                             rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                            minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
                             breakdown: {
                                 transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
                                 nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
@@ -339,6 +367,7 @@ export const simulateInitializeNfnodeTransaction = async (
                         userBalance: userBalance / LAMPORTS_PER_SOL,
                         requiredBalance: totalRequired / LAMPORTS_PER_SOL,
                         rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                        minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
                         breakdown: {
                             transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
                             nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
@@ -350,6 +379,235 @@ export const simulateInitializeNfnodeTransaction = async (
 
             } catch (error) {
                 console.error('Error in simulateInitializeNfnodeTransaction:', error);
+                return {
+                    feeInLamports: 0,
+                    feeInSol: 0,
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR
+                };
+            }
+        }
+    );
+};
+
+export const simulateClaimRewardTransaction = async (
+    walletAddress: string,
+    amountToClaim: number,
+    nftMintAddress: string,
+    claimerType: 'owner' | 'other'
+): Promise<SimulationResult> => {
+    return simulationCache.getOrExecute(
+        { 
+            type: 'claim_reward', 
+            walletAddress, 
+            amountToClaim, 
+            nftMintAddress, 
+            claimerType 
+        },
+        async () => {
+            try {
+                const program = await RewardSystemManager.getInstance();
+                const connection = getSolanaConnection();
+                const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
+                const priorityFeeInSol = await getSolanaPriorityFee();
+
+                // validate wallet address
+                try {
+                    new PublicKey(walletAddress);
+                } catch (error) {
+                    return {
+                        feeInLamports: 0,
+                        feeInSol: 0,
+                        success: false,
+                        error: 'Invalid wallet address format',
+                        code: SIMULATE_REQUEST_TX_CODES.INVALID_WALLET_ADDRESS
+                    }
+                }
+
+                const user = new PublicKey(walletAddress);
+                const nftMint = new PublicKey(nftMintAddress);
+
+                // get user balance
+                const userBalance = await connection.getBalance(user);
+
+                // prepare transaction parameters
+                const rewardTokenMint = await getRewardTokenMint();
+                const mint = new PublicKey(rewardTokenMint);
+                const amount = new BN(convertToTokenAmount(amountToClaim));
+                const nonce = new BN(Date.now());
+
+                // prepare accounts
+                const accounts = await prepareAccountsToClaimReward({ 
+                    program, 
+                    mint, 
+                    userWallet: user, 
+                    nftMint, 
+                    claimerType, 
+                    adminKeypair 
+                });
+
+                if (!accounts) {
+                    return {
+                        feeInLamports: 0,
+                        feeInSol: 0,
+                        success: false,
+                        error: 'Failed to prepare accounts',
+                        code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR
+                    }
+                }
+
+                // create instruction
+                let ix: anchor.web3.TransactionInstruction;
+                if (claimerType === 'owner') {
+                    ix = await program.methods
+                        .ownerClaimRewards(amount, nonce)
+                        .accounts(accounts as unknown as any)
+                        .instruction();
+                } else {
+                    ix = await program.methods
+                        .othersClaimRewards(amount, nonce)
+                        .accounts(accounts)
+                        .instruction();
+                }
+
+                // get last blockhash
+                const { blockhash } = await connection.getLatestBlockhash();
+
+                // Convert SOL to microLamports per compute unit
+                const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
+                // Now create the final transaction with the correct priority fee
+                const finalMessageV0 = new TransactionMessage({
+                    payerKey: user,
+                    recentBlockhash: blockhash,
+                    instructions: [
+                        ComputeBudgetProgram.setComputeUnitPrice({
+                            microLamports: microLamportsPerComputeUnit
+                        }),
+                        ix
+                    ],
+                }).compileToV0Message();
+
+                // create versioned transaction
+                const transaction = new VersionedTransaction(finalMessageV0);
+                transaction.sign([adminKeypair]);
+
+                // simulate and get fee
+                const fees = await connection.getFeeForMessage(finalMessageV0);
+                const feeInLamports = fees.value || 0;
+
+                // calculate the space needed for the reward entry account
+                const REWARD_ENTRY_SIZE = 8 + 8 + 8; // discriminator + lastClaimedNonce + totalClaimed
+
+                // get rent exempt for the reward entry account
+                const rentExemptRewardEntry = await connection.getMinimumBalanceForRentExemption(REWARD_ENTRY_SIZE);
+
+                // get rent exempt for the token account if it doesn't exist
+                const userTokenAccount = await getAssociatedTokenAddress(
+                    new PublicKey(rewardTokenMint),
+                    user
+                );
+                const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
+                const userTokenAccountRent = !userTokenAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
+
+                // calculate the total required balance
+                const requiredBalance = feeInLamports + 
+                    rentExemptRewardEntry + 
+                    userTokenAccountRent + 
+                    MINIMUM_REMAINING_SOLANA_BALANCE +
+                    priorityFeeInSol;
+
+                const hasEnoughBalance = userBalance >= requiredBalance;
+
+                // 1. Get the token storage account address (already in accounts.tokenStorageAccount)
+                const tokenStorageAccount = accounts.tokenStorageAccount;
+
+                // 2. Get the token balance
+                const tokenStorageAccountInfo = await connection.getTokenAccountBalance(tokenStorageAccount);
+                const tokenStorageBalance = Number(tokenStorageAccountInfo.value.amount); // in smallest unit
+
+                // 3. Compare with amountToClaim (also in smallest unit)
+                const amountToClaimInSmallestUnit = convertToTokenAmount(amountToClaim);
+                const hasEnoughProgramTokens = tokenStorageBalance >= amountToClaimInSmallestUnit;
+
+                // 4. Add this info to the response
+                if (!hasEnoughProgramTokens) {
+                    return {
+                        feeInLamports,
+                        feeInSol: requiredBalance / LAMPORTS_PER_SOL,
+                        success: false,
+                        error: "Program does not have enough reward tokens to pay the claim.",
+                        code: SIMULATE_REQUEST_TX_CODES.PROGRAM_DOES_NOT_HAVE_ENOUGH_REWARD_TOKENS,
+                        details: {
+                            hasEnoughBalance,
+                            userBalance: userBalance / LAMPORTS_PER_SOL,
+                            requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
+                            programTokenBalance: tokenStorageBalance,
+                            amountToClaim: amountToClaimInSmallestUnit,
+                            breakdown: {
+                                transactionFee: feeInLamports / LAMPORTS_PER_SOL,
+                                priorityFee: priorityFeeInSol / LAMPORTS_PER_SOL,
+                                rewardEntryRent: rentExemptRewardEntry / LAMPORTS_PER_SOL,
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
+                            }
+                        }
+                    };
+                }
+
+                // simulate transaction
+                const simulationFinal = await connection.simulateTransaction(transaction, {
+                    commitment: 'confirmed',
+                    sigVerify: false,
+                    replaceRecentBlockhash: true
+                });
+
+                if (simulationFinal.value.err) {
+                    console.log('simulation logs:', simulationFinal.value.logs);
+                    return {
+                        feeInLamports,
+                        feeInSol: requiredBalance / LAMPORTS_PER_SOL,
+                        success: false,
+                        error: JSON.stringify(simulationFinal.value.err),
+                        code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+                        details: {
+                            hasEnoughBalance,
+                            userBalance: userBalance / LAMPORTS_PER_SOL,
+                            requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
+                            rentExemptBalance: rentExemptRewardEntry / LAMPORTS_PER_SOL,
+                            breakdown: {
+                                transactionFee: feeInLamports / LAMPORTS_PER_SOL,
+                                priorityFee: priorityFeeInSol,
+                                rewardEntryRent: rentExemptRewardEntry / LAMPORTS_PER_SOL,
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
+                            }
+                        }
+                    };
+                }
+
+                return {
+                    feeInLamports,
+                    feeInSol: requiredBalance / LAMPORTS_PER_SOL,
+                    success: hasEnoughBalance ? true : false,
+                    code: SIMULATE_REQUEST_TX_CODES.SUCCESS,
+                    details: {
+                        hasEnoughBalance,
+                        userBalance: userBalance / LAMPORTS_PER_SOL,
+                        requiredBalance: requiredBalance / LAMPORTS_PER_SOL,
+                        rentExemptBalance: rentExemptRewardEntry / LAMPORTS_PER_SOL,
+                        breakdown: {
+                            transactionFee: feeInLamports / LAMPORTS_PER_SOL,
+                            priorityFee: priorityFeeInSol,
+                            rewardEntryRent: rentExemptRewardEntry / LAMPORTS_PER_SOL,
+                            userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL
+                        }
+                    }
+                };
+
+            } catch (error) {
+                console.error('Error simulate claim reward transaction:', error);
                 return {
                     feeInLamports: 0,
                     feeInSol: 0,

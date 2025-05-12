@@ -42,7 +42,6 @@ export interface ClaimRewardsMessage {
     walletAddress: string;
     totalAmount: number;
     minerId: number;
-    rewardsId: number[];
     type: ClaimerType
     solanaAssetId: string;
     nonce: number;

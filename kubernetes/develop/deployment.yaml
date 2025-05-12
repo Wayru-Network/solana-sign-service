@@ -20,7 +20,7 @@ spec:
             - name: DATABASE_HOST
               value: "172.168.206.66"
             - name: DATABASE_NAME
-              value: dashboard_prod_test
+              value: db_test
             - name: DATABASE_PORT
               value: "5432"
             - name: DATABASE_USERNAME

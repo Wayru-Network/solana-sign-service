@@ -46,6 +46,25 @@ app.on('error', async (err, ctx) => {
   }
 });
 
+// Add request timeout middleware
+app.use(async (ctx, next) => {
+  const timeout = 30000; // 30 seconds
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), timeout);
+  });
+  
+  try {
+    await Promise.race([next(), timeoutPromise]);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Request timeout') {
+      ctx.status = 504;
+      ctx.body = { error: 'Request timeout' };
+    } else {
+      throw error;
+    }
+  }
+});
+
 // Initialize server
 const PORT = Number(ENV.PORT);
 app.listen(PORT, '0.0.0.0', () => {
