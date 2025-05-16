@@ -14,6 +14,8 @@ import { updateTransactionTrackerStatus, verifyTransactionTrackerToClaimRewards 
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
+import { prepareTransactionToClaimLostTokens } from "@services/airdrops-program/airdrops-program.service";
+import { prepareTransactionToInitializeAndStakeNFNode } from "@services/stake-program/stake-program.service";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -667,6 +669,106 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
             serializedTx: null,
             error: true,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_ERROR_CODE
+        }
+    }
+}
+
+/**
+ * Request to update reward contract
+ * @param signature - The signature of the update reward contract message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToUpdateRewardContract = async (signature: string): Promise<{
+    serializedTxToInitNFN: string | null;
+    serializedTxToStakeNFNode: string | null;
+    txBase64ClaimLostTokens: string | null;
+    error: boolean;
+    code: string;
+}> => {
+    try {
+        // verify the signature
+        const { isValid, message } = await verifyTransactionSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTxToInitNFN: null,
+                serializedTxToStakeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        const data = await processMessageData('update-reward-contract', message);
+        if (!data) {
+            return {
+                serializedTxToInitNFN: null,
+                serializedTxToStakeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, solanaAssetId, nonce, nfnodeType, extraAmountToDeposit, manufacturerAddress, hostAddress } = data;
+        const userWallet = new PublicKey(walletAddress);
+
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTxToInitNFN: null,
+                serializedTxToStakeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+
+        // prepare transaction to claim lost tokens
+        const txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
+        if (!txBase64ClaimLostTokens) {
+            return {
+                serializedTxToInitNFN: null,
+                serializedTxToStakeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_CLAIM_LOST_TOKENS_ERROR_CODE
+            }
+        }
+        // prepare transaction to initialize NFNode
+        const { serializedTxToInitNFN, serializedTxToStakeNFNode } = await prepareTransactionToInitializeAndStakeNFNode({
+            userWallet,
+            hostAddress: new PublicKey(hostAddress),
+            manufacturerAddress: new PublicKey(manufacturerAddress),
+            solanaAssetId: new PublicKey(solanaAssetId),
+            extraAmountToDeposit,
+            nfnodeType
+        });
+        if (!serializedTxToInitNFN || (!serializedTxToStakeNFNode && extraAmountToDeposit > 0)) {
+            return {
+                serializedTxToInitNFN: null,
+                serializedTxToStakeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_INITIALIZE_AND_STAKE_NFNODE_ERROR_CODE
+            }
+        }
+
+        return {
+            serializedTxToInitNFN,
+            serializedTxToStakeNFNode,
+            txBase64ClaimLostTokens,
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_SUCCESS_CODE
+        }
+
+
+    } catch (error) {
+        console.error(`Error requesting transaction to update reward contract:`, error);
+        return {
+            serializedTxToInitNFN: null,
+            serializedTxToStakeNFNode: null,
+            txBase64ClaimLostTokens: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_ERROR_CODE
         }
     }
 }

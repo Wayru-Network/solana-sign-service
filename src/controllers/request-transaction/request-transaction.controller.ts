@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionDepositTokens, requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost, requestTransactionWithdrawTokens } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionDepositTokens, requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToUpdateHost, requestTransactionToUpdateRewardContract, requestTransactionWithdrawTokens } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -273,6 +273,50 @@ export class RequestTransactionController {
           error: true,
           message: 'internal server error',
           code: 'DT-002'
+        };
+      }
+    }
+  }
+  static async updateRewardContract(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionToUpdateRewardContract(signature);
+      if (response.error || !response.serializedTxToInitNFN || !response.serializedTxToStakeNFNode || !response.txBase64ClaimLostTokens) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTxToInitNFN: response.serializedTxToInitNFN,
+          serializedTxToStakeNFNode: response.serializedTxToStakeNFNode,
+          txBase64ClaimLostTokens: response.txBase64ClaimLostTokens
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = response;  
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors,
+          code: 'URC-001'
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error',
+          code: 'URC-002'
         };
       }
     }

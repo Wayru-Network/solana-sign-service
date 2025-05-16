@@ -1,11 +1,11 @@
-import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProcessMessageByType, MessageType, NFNodeType, NFNodeTypeEnum } from "@/interfaces/request-transaction/request-transaction.interface";
+import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProcessMessageByType, MessageType, NFNodeTypeEnum } from "@/interfaces/request-transaction/request-transaction.interface";
 import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema } from "@validations/request-transaction/request-transaction.validation";
+import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema } from "@validations/request-transaction/request-transaction.validation";
 import nacl from 'tweetnacl';
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
@@ -195,6 +195,9 @@ export const processMessageData = async <T extends MessageType>(type: T, message
                 return data;
             case 'deposit-tokens':
                 await depositTokensSchema.validate(data);
+                return data;
+            case 'update-reward-contract':
+                await updateRewardContractSchema.validate(data);
                 return data;
             default:
                 return null;
