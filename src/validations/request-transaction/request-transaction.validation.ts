@@ -82,3 +82,14 @@ export const depositTokensSchema = yup.object().shape({
   solanaAssetId: yup.string().required('Solana asset ID is required'),
   nonce: yup.number().required('Nonce is required')
 });
+
+export const updateRewardContractSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required'),
+  nfnodeType: yup.object().required('NFNode type is required'),
+  manufacturerAddress: yup.string().required('Manufacturer address is required'),
+  hostAddress: yup.string().required('Host address is required'),
+  status: yup.string().oneOf(['invalid_nfnode', 'only_init_nfnode', 'claim_and_init_nfnode'], 'Invalid status').required('Status is required')
+});
+

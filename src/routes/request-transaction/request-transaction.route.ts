@@ -46,6 +46,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.depositTokens(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/to-update-reward-contract',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.updateRewardContract(ctx);
+    }
   }
 ];
 
