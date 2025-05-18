@@ -88,8 +88,8 @@ export const updateRewardContractSchema = yup.object().shape({
   solanaAssetId: yup.string().required('Solana asset ID is required'),
   nonce: yup.number().required('Nonce is required'),
   nfnodeType: yup.object().required('NFNode type is required'),
-  extraAmountToDeposit: yup.number().positive('Total amount must be positive'),
   manufacturerAddress: yup.string().required('Manufacturer address is required'),
-  hostAddress: yup.string().required('Host address is required')
+  hostAddress: yup.string().required('Host address is required'),
+  status: yup.string().oneOf(['invalid_nfnode', 'only_init_nfnode', 'claim_and_init_nfnode'], 'Invalid status').required('Status is required')
 });
 

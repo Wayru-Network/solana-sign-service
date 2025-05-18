@@ -15,7 +15,7 @@ import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 import { prepareTransactionToClaimLostTokens } from "@services/airdrops-program/airdrops-program.service";
-import { prepareTransactionToInitializeAndStakeNFNode } from "@services/stake-program/stake-program.service";
+import { prepareTransactionToInitializeNFNode } from "@services/rewards-program/rewards-program.service";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -679,8 +679,7 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
  */
 export const requestTransactionToUpdateRewardContract = async (signature: string): Promise<{
-    serializedTxToInitNFN: string | null;
-    serializedTxToStakeNFNode: string | null;
+    txBase64InitializeNFNode: string | null;
     txBase64ClaimLostTokens: string | null;
     error: boolean;
     code: string;
@@ -690,8 +689,7 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         const { isValid, message } = await verifyTransactionSignature(signature);
         if (!isValid || !message) {
             return {
-                serializedTxToInitNFN: null,
-                serializedTxToStakeNFNode: null,
+                txBase64InitializeNFNode: null,
                 txBase64ClaimLostTokens: null,
                 error: true,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_INVALID_SIGNATURE_ERROR_CODE
@@ -700,22 +698,20 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         const data = await processMessageData('update-reward-contract', message);
         if (!data) {
             return {
-                serializedTxToInitNFN: null,
-                serializedTxToStakeNFNode: null,
+                txBase64InitializeNFNode: null,
                 txBase64ClaimLostTokens: null,
                 error: true,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_INVALID_DATA_ERROR_CODE
             };
         }
-        const { walletAddress, solanaAssetId, nonce, nfnodeType, extraAmountToDeposit, manufacturerAddress, hostAddress } = data;
+        const { walletAddress, solanaAssetId, nonce, nfnodeType, manufacturerAddress, hostAddress, status } = data;
         const userWallet = new PublicKey(walletAddress);
 
         // validate signature status
         const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
         if (!isValidSignature) {
             return {
-                serializedTxToInitNFN: null,
-                serializedTxToStakeNFNode: null,
+                txBase64InitializeNFNode: null,
                 txBase64ClaimLostTokens: null,
                 error: true,
                 code: codeSignature
@@ -723,38 +719,37 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         }
 
         // prepare transaction to claim lost tokens
-        const txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
+        let txBase64ClaimLostTokens: string | null = null;
+        if (status === 'claim_and_init_nfnode') {
+            txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
         if (!txBase64ClaimLostTokens) {
             return {
-                serializedTxToInitNFN: null,
-                serializedTxToStakeNFNode: null,
+                txBase64InitializeNFNode: null,
                 txBase64ClaimLostTokens: null,
                 error: true,
                 code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_CLAIM_LOST_TOKENS_ERROR_CODE
             }
         }
+          }
         // prepare transaction to initialize NFNode
-        const { serializedTxToInitNFN, serializedTxToStakeNFNode } = await prepareTransactionToInitializeAndStakeNFNode({
-            userWallet,
+        const txBase64InitializeNFNode = await prepareTransactionToInitializeNFNode({
+            walletOwnerAddress: userWallet,
             hostAddress: new PublicKey(hostAddress),
             manufacturerAddress: new PublicKey(manufacturerAddress),
             solanaAssetId: new PublicKey(solanaAssetId),
-            extraAmountToDeposit,
             nfnodeType
         });
-        if (!serializedTxToInitNFN || (!serializedTxToStakeNFNode && extraAmountToDeposit > 0)) {
+        if (!txBase64InitializeNFNode) {
             return {
-                serializedTxToInitNFN: null,
-                serializedTxToStakeNFNode: null,
+                txBase64InitializeNFNode: null,
                 txBase64ClaimLostTokens: null,
                 error: true,
-                code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_INITIALIZE_AND_STAKE_NFNODE_ERROR_CODE
+                code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_INITIALIZE_NFNODE_ERROR_CODE
             }
         }
 
         return {
-            serializedTxToInitNFN,
-            serializedTxToStakeNFNode,
+            txBase64InitializeNFNode,
             txBase64ClaimLostTokens,
             error: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_SUCCESS_CODE
@@ -764,8 +759,7 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
     } catch (error) {
         console.error(`Error requesting transaction to update reward contract:`, error);
         return {
-            serializedTxToInitNFN: null,
-            serializedTxToStakeNFNode: null,
+            txBase64InitializeNFNode: null,
             txBase64ClaimLostTokens: null,
             error: true,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_REWARD_CONTRACT_ERROR_CODE

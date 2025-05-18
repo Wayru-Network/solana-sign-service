@@ -100,9 +100,9 @@ interface UpdateRewardContractMessage {
     nonce: number;
     solanaAssetId: string;
     nfnodeType: Record<NFNodeType, {}>
-    extraAmountToDeposit: number;
     manufacturerAddress: string;
     hostAddress: string;
+    status: 'invalid_nfnode' | 'only_init_nfnode' | 'claim_and_init_nfnode'
 }
 
 // Mapping between message types and their payloads

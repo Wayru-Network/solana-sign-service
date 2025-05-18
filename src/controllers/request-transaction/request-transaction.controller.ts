@@ -288,15 +288,9 @@ export class RequestTransactionController {
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
       const response = await requestTransactionToUpdateRewardContract(signature);
-      if (response.error || !response.serializedTxToInitNFN || !response.serializedTxToStakeNFNode || !response.txBase64ClaimLostTokens) {
+      if (response.error) {
         ctx.status = 400;
-        ctx.body = {
-          error: true,
-          code: response.code,
-          serializedTxToInitNFN: response.serializedTxToInitNFN,
-          serializedTxToStakeNFNode: response.serializedTxToStakeNFNode,
-          txBase64ClaimLostTokens: response.txBase64ClaimLostTokens
-        };
+        ctx.body = response
       } else {
         ctx.status = 200;
         ctx.body = response;  

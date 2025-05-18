@@ -1,117 +1,14 @@
-import { NFNodeTypeEnum } from "@interfaces/request-transaction/request-transaction.interface";
 import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { ComputeBudgetProgram, PublicKey, SystemProgram } from "@solana/web3.js";
-import anchor, { BN } from "@coral-xyz/anchor";
-import { getKeyPairFromUnit8Array, getRewardTokenMint, getSolanaPriorityFee } from "@helpers/solana/solana.helpers";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { BN } from "bn.js";
+import * as anchor from "@coral-xyz/anchor";
+import { getKeyPairFromUnit8Array, getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { ENV } from "@config/env/env";
 import { convertToTokenAmount, getUserNFTTokenAccount } from "@services/solana/solana.service";
-import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
-
-export const prepareTransactionToInitializeNFNode = async (
-    props: {
-        userWallet: PublicKey;
-        hostAddress: PublicKey;
-        manufacturerAddress: PublicKey;
-        solanaAssetId: PublicKey;
-        nfnodeType: { don: {} } | { byod: {} } | { wayruHotspot: {} };
-    }): Promise<string | null> => {
-    try {
-        const { userWallet, hostAddress, manufacturerAddress, solanaAssetId, nfnodeType } = props;
-        // prepare transaction parameters
-        const hostShare = new BN(0); // host share of the NFT is 0
-        const program = await RewardSystemManager.getInstance();
-        const adminKeypair = getKeyPairFromUnit8Array(Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)));
-        const manufacturer = new PublicKey(manufacturerAddress); // manufacturer of the NFT
-        const nftMintAddress = new PublicKey(solanaAssetId); // mint address of the NFT
-        const userNFTTokenAccount = await getUserNFTTokenAccount(nftMintAddress, userWallet);
-        const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
-            [Buffer.from("nfnode_entry"), nftMintAddress.toBuffer()],
-            program.programId
-        );
-        const [adminAccountPDA] = PublicKey.findProgramAddressSync(
-            [Buffer.from("admin_account")],
-            program.programId
-        );
-        // Derive token storage authority PDA
-        const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
-            [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
-            program.programId
-        );
-        // Obtain the user token account
-        const rewardTokenMint = await getRewardTokenMint();
-        const userTokenAccount = await getAssociatedTokenAddress(
-            new PublicKey(rewardTokenMint),
-            userWallet
-        );
-
-        // Obtain the token storage account
-        const tokenStorageAccount = await getAssociatedTokenAddress(
-            new PublicKey(rewardTokenMint),
-            tokenStorageAuthority,
-            true // allowOwnerOffCurve = true para PDAs
-        );
-        const tokenMint = new PublicKey(rewardTokenMint);
-        // Add priority fee
-        const priorityFeeInSol = await getSolanaPriorityFee();
-        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
-
-        const accounts = {
-            userAdmin: adminKeypair.publicKey,
-            user: userWallet,
-            nftMintAddress: nftMintAddress,
-            userNftTokenAccount: userNFTTokenAccount,
-            host: hostAddress,
-            manufacturer: manufacturer,
-            tokenMint: tokenMint,
-            nfnodeEntry: nfnodeEntryPDA,
-            adminAccount: adminAccountPDA,
-            tokenStorageAuthority,
-            tokenStorageAccount,
-            userTokenAccount,
-            tokenProgram2022: TOKEN_2022_PROGRAM_ID,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-            systemProgram: SystemProgram.programId
-        } as const;
-
-        // create a transaction to initialize the NFNode
-        const ixInitializeNFNode = await program.methods
-            .initializeNfnode(hostShare, nfnodeType as Record<NFNodeTypeEnum, never>)
-            .accounts(accounts)
-            .transaction()
-
-        // create a transaction to stake the NFNode
-
-        // get the latest blockhash
-        const connection = getSolanaConnection();
-        let tx = new anchor.web3.Transaction();
-        tx.add(
-            ComputeBudgetProgram.setComputeUnitPrice({
-                microLamports: microLamportsPerComputeUnit,
-            }),
-            ixInitializeNFNode
-        );
-        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-        tx.feePayer = userWallet;  // set the fee payer
-
-        // sign admin keypair
-        tx.partialSign(adminKeypair)
-
-        // serialize tx
-        const serializedTx = tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: false,
-        });
-        const txBase64 = serializedTx.toString("base64");
-        return txBase64;
-    } catch (error) {
-        console.error('Error preparing transaction to initialize NFNode:', error);
-        return null;
-    }
-}
+import { prepareTransactionToInitializeNFNode } from "@services/rewards-program/rewards-program.service";
 
 export const prepareTransactionToStakeNFNode = async (
     props: {
@@ -262,7 +159,7 @@ export const prepareTransactionToInitializeAndStakeNFNode = async (
         const { userWallet, hostAddress, manufacturerAddress, solanaAssetId, extraAmountToDeposit, nfnodeType } = props;
         // first prepare the transaction to initialize the NFNode
         const txBase64InitializeNFNode = await prepareTransactionToInitializeNFNode({
-            userWallet,
+            walletOwnerAddress: userWallet,
             hostAddress,
             manufacturerAddress,
             solanaAssetId,
@@ -308,7 +205,7 @@ export const prepareTransactionToInitializeAndStakeNFNode = async (
             serializedTxToInitNFN: null,
             serializedTxToStakeNFNode: null,
             error: true,
-            code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_INITIALIZE_AND_STAKE_NFNODE_ERROR_CODE
+            code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_INITIALIZE_NFNODE_ERROR_CODE
         }
     }
 }
