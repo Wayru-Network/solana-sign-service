@@ -1,4 +1,4 @@
-import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
+import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
 import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeStakeTransaction } from "@services/request-transaction/simulate-request-tx.service";
 import { WalletAddressBody } from "@interfaces/request-transaction/api";
 import { SimulateInitNfnodeParams, SimulateInitStakeParams } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
@@ -14,7 +14,7 @@ export class SimulateRequestTxController {
         const result = await simulateInitializeNfnodeTransaction(body);
         return ctx.body = result
     }
-    static async simulateInitializeStake(ctx: CtxSimulateInitNfnode) {
+    static async simulateInitializeStake(ctx: CtxSimulateInitStake) {
         const body = ctx?.request?.body as SimulateInitStakeParams;
         const result = await simulateInitializeStakeTransaction(body);
         return ctx.body = result
