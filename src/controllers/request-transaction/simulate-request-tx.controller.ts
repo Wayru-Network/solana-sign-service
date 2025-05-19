@@ -1,9 +1,14 @@
-import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
-import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeStakeTransaction } from "@services/request-transaction/simulate-request-tx.service";
+import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxSimulateUnstake, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
+import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeStakeTransaction, simulateStakeTransaction, simulateUnstakeTransaction, simulateUpdateContractTransactions } from "@services/request-transaction/simulate-request-tx.service";
 import { WalletAddressBody } from "@interfaces/request-transaction/api";
-import { SimulateInitNfnodeParams, SimulateInitStakeParams } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
+import { SimulateInitNfnodeParams, SimulateInitStakeParams, SimulateUnstakeParams } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
 
 export class SimulateRequestTxController {
+    static async simulateUpdateRewardContract(ctx: CtxSimulateInitNfnode) {
+        const body = ctx?.request?.body as SimulateInitNfnodeParams;
+        const result = await simulateUpdateContractTransactions(body)
+        return ctx.body = result
+    }
     static async simulateClaimWCredits(ctx: CtxWalletAddress) {
         const { walletAddress } = ctx?.request?.body as WalletAddressBody;
         const result = await simulateClaimWCreditsTransaction(walletAddress);
@@ -14,9 +19,19 @@ export class SimulateRequestTxController {
         const result = await simulateInitializeNfnodeTransaction(body);
         return ctx.body = result
     }
+    static async simulateUnstake(ctx: CtxSimulateUnstake) {
+        const body = ctx?.request?.body as SimulateUnstakeParams;
+        const result = await simulateUnstakeTransaction(body);
+        return ctx.body = result
+    }
     static async simulateInitializeStake(ctx: CtxSimulateInitStake) {
         const body = ctx?.request?.body as SimulateInitStakeParams;
         const result = await simulateInitializeStakeTransaction(body);
+        return ctx.body = result
+    }
+    static async simulateStake(ctx: CtxSimulateInitStake) {
+        const body = ctx?.request?.body as SimulateInitStakeParams;
+        const result = await simulateStakeTransaction(body);
         return ctx.body = result
     }
     static async simulateClaimReward(ctx: CtxSimulateClaimReward) {

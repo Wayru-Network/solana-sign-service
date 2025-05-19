@@ -11,6 +11,10 @@ export interface SimulateInitStakeParams {
     nftMintAddress: string;
     amount: number;
 }
+export interface SimulateUnstakeParams {
+    walletAddress: string;
+    nftMintAddress: string;
+}
 
 export interface SimulationResult {
     feeInLamports: number;
@@ -22,11 +26,13 @@ export interface SimulationResult {
         userBalance: number;
         requiredBalance: number;
         rentExemptBalance?: number;
+        minimumRequired?: number;
         breakdown?: {
             transactionFee: number;
             claimEntryRent?: number;
             tokenAccountRent?: number;
             nfnodeEntryRent?: number;
+            userTokenAccountRent?: number;
         };
     };
     code?: string;

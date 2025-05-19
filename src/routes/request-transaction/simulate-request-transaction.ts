@@ -1,10 +1,17 @@
 import Router from 'koa-router';
 import { Route } from '@/interfaces/api/api';
-import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxWalletAddress } from '@/interfaces/request-transaction/api';
+import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxSimulateUnstake, CtxWalletAddress } from '@/interfaces/request-transaction/api';
 import { SimulateRequestTxController } from '@/controllers/request-transaction/simulate-request-tx.controller';
 const router = new Router();
 
 const routes: Route[] = [
+  {
+    method: 'post',
+    path: '/simulate-upgrade-reward-contract',
+    handler: async (ctx: CtxSimulateInitNfnode) => {
+      await SimulateRequestTxController.simulateUpdateRewardContract(ctx);
+    }
+  },
   {
     method: 'post',
     path: '/simulate-claim-w-credits',
@@ -24,6 +31,20 @@ const routes: Route[] = [
     path: '/simulate-initialize-stake',
     handler: async (ctx: CtxSimulateInitStake) => {
       await SimulateRequestTxController.simulateInitializeStake(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/simulate-stake',
+    handler: async (ctx: CtxSimulateInitStake) => {
+      await SimulateRequestTxController.simulateStake(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/simulate-unstake',
+    handler: async (ctx: CtxSimulateUnstake) => {
+      await SimulateRequestTxController.simulateUnstake(ctx);
     }
   }
   ,
