@@ -7,6 +7,13 @@ const router = new Router();
 const routes: Route[] = [
   {
     method: 'post',
+    path: '/simulate-upgrade-reward-contract',
+    handler: async (ctx: CtxSimulateInitNfnode) => {
+      await SimulateRequestTxController.simulateUpdateRewardContract(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/simulate-claim-w-credits',
     handler: async (ctx: CtxWalletAddress) => {
       await SimulateRequestTxController.simulateClaimWCredits(ctx);
