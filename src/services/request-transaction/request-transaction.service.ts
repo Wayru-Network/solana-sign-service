@@ -1025,12 +1025,12 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         // prepare transaction to claim lost tokens
         let txBase64ClaimLostTokens: string | null = null;
         if (status === 'claim_and_init_nfnode') {
-            txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
-            if (!txBase64ClaimLostTokens) {
-                return {
-                    txBase64InitializeNFNode: null,
-                    txBase64ClaimLostTokens: null,
-                    error: true,
+            txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet);
+        if (!txBase64ClaimLostTokens) {
+            return {
+                txBase64InitializeNFNode: null,
+                txBase64ClaimLostTokens: null,
+                error: true,
                     code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_CLAIM_LOST_TOKENS_ERROR_CODE
                 }
             }
