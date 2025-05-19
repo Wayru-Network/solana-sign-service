@@ -391,6 +391,7 @@ export const simulateInitializeNfnodeTransaction = async (
         }
     );
 };
+
 export const simulateInitializeStakeTransaction = async (
     { walletAddress,
         nftMintAddress,amount

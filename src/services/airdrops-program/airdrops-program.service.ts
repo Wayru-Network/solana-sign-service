@@ -27,13 +27,9 @@ export const prepareTransactionToClaimLostTokens = async (userWallet: PublicKey)
  
          // amount to claim
          const amount = new BN(convertToTokenAmount(amountToClaim));
-         const { nonce, isValid } = generateSafeNonce();
-         if (!isValid || !nonce) {
-            return null;
-         }
-         
+      
          const ix = await program.methods
-             .claimTokens(amount, new BN(nonce))
+             .claimTokens(amount, new BN(new Date().getTime()))
              .accounts({
                  userAdmin: adminKeypair.publicKey,
                  user: user,
