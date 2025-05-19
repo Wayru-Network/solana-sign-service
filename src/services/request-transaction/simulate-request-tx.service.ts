@@ -9,7 +9,7 @@ import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { SystemProgram } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { SimulateInitNfnodeParams, SimulationResult } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
+import { SimulateInitNfnodeParams, SimulateInitStakeParams, SimulationResult } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
 import { getNFNodeTypeRecord } from "@helpers/request-transaction/request-transaction.helper";
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
@@ -18,6 +18,7 @@ import { simulationCache } from '../simulation-cache/simulation-cache.service';
 import { prepareAccountsToClaimReward } from "@helpers/request-transaction/request-transaction.helper";
 import * as anchor from "@coral-xyz/anchor";
 import { MINIMUM_REMAINING_SOLANA_BALANCE } from "@constants/solana/solana.constants";
+import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
@@ -284,6 +285,190 @@ export const simulateInitializeNfnodeTransaction = async (
 
                 const initializeNfnodeIx = await program.methods
                     .initializeNfnode(new BN(0), getNFNodeTypeRecord(nfnodeType))
+                    .accounts(accounts)
+                    .instruction();
+
+                // Get latest blockhash
+                const latestBlockhash = await connection.getLatestBlockhash();
+
+                // Convert SOL to microLamports per compute unit
+                const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
+                // Create TransactionMessage
+                const messageV0 = new TransactionMessage({
+                    payerKey: user,
+                    recentBlockhash: latestBlockhash.blockhash,
+                    instructions: [
+                        ComputeBudgetProgram.setComputeUnitLimit({
+                            units: 300_000  // Límite por defecto
+                        }),
+                        ComputeBudgetProgram.setComputeUnitPrice({
+                            microLamports: microLamportsPerComputeUnit
+                        }),
+                        initializeNfnodeIx
+                    ]
+                }).compileToV0Message();
+
+                // Create VersionedTransaction
+                const transaction = new VersionedTransaction(messageV0);
+
+                // Get user's current balance
+                const userBalance = await connection.getBalance(user);
+                
+                // Calculate rent exempt for nfnode entry
+                const nfnodeEntryRent = await connection.getMinimumBalanceForRentExemption(165);
+
+                // Get transaction fee
+                const transactionFee = await connection.getFeeForMessage(messageV0);
+                if (transactionFee.value === null) {
+                    throw new Error('Failed to get fee for message');
+                }
+                const feeInLamports = transactionFee.value || 0;
+
+                // Sum all required lamports
+                const totalRequired =
+                    nfnodeEntryRent +
+                    userTokenAccountRent +
+                    tokenStorageAccountRent +
+                    feeInLamports +
+                    MINIMUM_REMAINING_SOLANA_BALANCE;
+
+                // Simulate transaction
+                const simulation = await connection.simulateTransaction(transaction);
+
+                if (simulation.value.err) {
+                    console.log('simulation logs:', simulation.value.logs);
+                    return {
+                        success: false,
+                        feeInLamports: feeInLamports,
+                        feeInSol: totalRequired / LAMPORTS_PER_SOL,
+                        error: JSON.stringify(simulation.value.err),
+                        details: {
+                            hasEnoughBalance: userBalance >= totalRequired,
+                            userBalance: userBalance / LAMPORTS_PER_SOL,
+                            requiredBalance: totalRequired / LAMPORTS_PER_SOL,
+                            rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                            minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
+                            breakdown: {
+                                transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
+                                nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                                userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL,
+                                tokenStorageAccountRent: tokenStorageAccountRent / LAMPORTS_PER_SOL,
+                            }
+                        }
+                    };
+                }
+
+                return {
+                    success: true,
+                    feeInLamports: feeInLamports,
+                    feeInSol: totalRequired / LAMPORTS_PER_SOL,
+                    details: {
+                        hasEnoughBalance: userBalance >= totalRequired,
+                        userBalance: userBalance / LAMPORTS_PER_SOL,
+                        requiredBalance: totalRequired / LAMPORTS_PER_SOL,
+                        rentExemptBalance: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                        minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
+                        breakdown: {
+                            transactionFee: transactionFee.value / LAMPORTS_PER_SOL,
+                            nfnodeEntryRent: nfnodeEntryRent / LAMPORTS_PER_SOL,
+                            userTokenAccountRent: userTokenAccountRent / LAMPORTS_PER_SOL,
+                            tokenStorageAccountRent: tokenStorageAccountRent / LAMPORTS_PER_SOL,
+                        }
+                    }
+                };
+
+            } catch (error) {
+                console.error('Error in simulateInitializeNfnodeTransaction:', error);
+                return {
+                    feeInLamports: 0,
+                    feeInSol: 0,
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR
+                };
+            }
+        }
+    );
+};
+export const simulateInitializeStakeTransaction = async (
+    { walletAddress,
+        nftMintAddress,amount
+    }: SimulateInitStakeParams): Promise<SimulationResult> => {
+    return simulationCache.getOrExecute(
+        { 
+            type: 'initialize_stake', 
+            walletAddress, 
+            nftMintAddress, 
+        },
+        async () => {
+            try {
+                const program = await StakeSystemManager.getInstance();
+                const connection = getSolanaConnection();
+                const tokenMint = await getRewardTokenMint();
+                const priorityFeeInSol = await getSolanaPriorityFee();
+
+                // Initialize public keys
+                const user = new PublicKey(walletAddress);
+                const nftMint = new PublicKey(nftMintAddress);
+
+                // Get PDAs and accounts
+                const userNftTokenAccount = await getUserNFTTokenAccount(nftMint, user);
+                const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+                    [Buffer.from("nfnode_entry"), nftMint.toBuffer()],
+                    program.programId
+                );
+                const [adminAccountPDA] = PublicKey.findProgramAddressSync(
+                    [Buffer.from("admin_account")],
+                    program.programId
+                );
+                const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+                    [Buffer.from("token_storage"), nftMint.toBuffer()],
+                    program.programId
+                );
+
+                // Get ATAs
+                const userTokenAccount = await getAssociatedTokenAddress(
+                    new PublicKey(tokenMint),
+                    user
+                );
+                const tokenStorageAccount = await getAssociatedTokenAddress(
+                    new PublicKey(tokenMint),
+                    tokenStorageAuthority,
+                    true
+                );
+
+                // Check if the userTokenAccount exists
+                const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
+                const userTokenAccountRent = !userTokenAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
+
+                // Check if the tokenStorageAccount exists
+                const tokenStorageAccountInfo = await connection.getAccountInfo(tokenStorageAccount);
+                const tokenStorageAccountRent = !tokenStorageAccountInfo
+                    ? await connection.getMinimumBalanceForRentExemption(165)
+                    : 0;
+
+                // Add initialize nfnode instruction
+                const accounts = {
+                    user,
+                    nftMintAddress: nftMint,
+                    userNftTokenAccount,
+                    tokenMint: new PublicKey(tokenMint),
+                    nfnodeEntry: nfnodeEntryPDA,
+                    adminAccount: adminAccountPDA,
+                    tokenStorageAuthority,
+                    tokenStorageAccount,
+                    userTokenAccount,
+                    tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                    systemProgram: SystemProgram.programId
+                } as const;
+
+                const initializeNfnodeIx = await program.methods
+                    .initializeNfnode(new BN(amount*1000000))
                     .accounts(accounts)
                     .instruction();
 

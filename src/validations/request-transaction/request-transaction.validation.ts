@@ -52,6 +52,13 @@ export const initializeNfnodeSchema = yup.object().shape({
     }
   ).required('NFNode type is required')
 });
+export const initializeStakeSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet owner is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  //validate amount to be positive and lower or equal than 100000
+  amount: yup.number().required('Amount is required').positive('Amount must be positive').max(100000, 'Amount must be lower or equal than 100000'),
+  nonce: yup.number().required('Nonce is required'),
+});
 
 export const updateHostSchema = yup.object().shape({
   walletOwnerAddress: yup.string().required('Wallet owner is required'),
@@ -71,6 +78,12 @@ export const withdrawTokensSchema = yup.object().shape({
   nonce: yup.number().required('Nonce is required')
 });
 
+export const withdrawStakeTokensSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required')
+});
+
 export const claimWCreditsSchema = yup.object().shape({
   walletAddress: yup.string().required('Wallet address is required'),
   amountToClaim: yup.number().required('Amount to claim is required').positive('Amount must be positive'),
@@ -78,6 +91,12 @@ export const claimWCreditsSchema = yup.object().shape({
 });
 
 export const depositTokensSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required')
+});
+export const stakeTokensSchema = yup.object().shape({
+  amount: yup.number().required('Amount is required'),
   walletAddress: yup.string().required('Wallet address is required'),
   solanaAssetId: yup.string().required('Solana asset ID is required'),
   nonce: yup.number().required('Nonce is required')
