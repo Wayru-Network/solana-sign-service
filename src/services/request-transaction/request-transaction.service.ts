@@ -16,6 +16,7 @@ import { RewardSystemManager } from "@services/solana/contracts/reward-system.ma
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 import { prepareTransactionToClaimLostTokens } from "@services/airdrops-program/airdrops-program.service";
 import { prepareTransactionToInitializeNFNode } from "@services/rewards-program/rewards-program.service";
+import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -133,6 +134,133 @@ export const requestTransactionToInitializeNfnode = async (signature: string): R
 
         // sign admin keypair
         tx.partialSign(adminKeypair)
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // update tx status
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+
+        return {
+            serializedTx: serializedTx.toString("base64"),
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
+
+    } catch (error) {
+        console.error(`Error requesting transaction initialize nfnode:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE
+        }
+    }
+}
+/**
+ * Request a transaction to initialize a NFNode stake sntry
+ * @param {string} signature - The signature of the initialize nfnode message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToInitializeStakeEntry = async (signature: string): RequestTransactionResponse => {
+    try {
+        // verify the signature
+        const { isValid, message } = await verifyTransactionSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+
+        const data = await processMessageData('initialize-stake', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress,  solanaAssetId, amount, nonce } = data;
+
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+
+        // prepare transaction parameters
+        const amountBN = new BN(amount*1000000); // host share of the NFT is 0
+        const program = await StakeSystemManager.getInstance();
+        const user = new PublicKey(walletAddress); // owner of the NFT
+        const nftMintAddress = new PublicKey(solanaAssetId); // mint address of the NFT
+        const userNFTTokenAccount = await getUserNFTTokenAccount(nftMintAddress, user);
+        const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("nfnode_entry"), nftMintAddress.toBuffer()],
+            program.programId
+        );
+        // Derive token storage authority PDA
+        const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+            [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
+            program.programId
+        );
+        // Obtain the user token account
+        const rewardTokenMint = await getRewardTokenMint();
+        const userTokenAccount = await getAssociatedTokenAddress(
+            new PublicKey(rewardTokenMint),
+            user
+        );
+
+        // Obtain the token storage account
+        const tokenStorageAccount = await getAssociatedTokenAddress(
+            new PublicKey(rewardTokenMint),
+            tokenStorageAuthority,
+            true // allowOwnerOffCurve = true para PDAs
+        );
+        const tokenMint = new PublicKey(rewardTokenMint);
+        // Add priority fee
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
+        const accounts = {
+            user: user,
+            nftMintAddress: nftMintAddress,
+            userNftTokenAccount: userNFTTokenAccount,
+            tokenMint: tokenMint,
+            nfnodeEntry: nfnodeEntryPDA,
+            tokenStorageAuthority,
+            tokenStorageAccount,
+            userTokenAccount,
+            tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+        } as const;
+
+        // create a transaction
+        const ix = await program.methods
+            .initializeNfnode(amountBN)
+            .accounts(accounts)
+            .transaction()
+
+        // get the latest blockhash
+        const connection = getSolanaConnection();
+        let tx = new anchor.web3.Transaction();
+        tx.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: microLamportsPerComputeUnit,
+            }),
+            ix
+        );
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;  // set the fee payer
 
         // serialize tx
         const serializedTx = tx.serialize({
@@ -492,6 +620,97 @@ export const requestTransactionWithdrawTokens = async (signature: string): Promi
         }
     }
 }
+/**
+ * Request a transaction to withdraw staked tokens
+ * @param signature - The signature of the withdraw tokens message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionWithdrawStakedTokens = async (signature: string): Promise<RequestTransactionResponse> => {
+    try {
+        const { isValid, message } = await verifyTransactionSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        // decode the message
+        const data = await processMessageData('withdraw-tokens', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, solanaAssetId, nonce } = data;
+
+        // validate signature status // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+
+        const connection = getSolanaConnection();
+        const program = await StakeSystemManager.getInstance();
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(solanaAssetId);
+        // get the user nft token account
+        const userNFTTokenAccount = await getAssociatedTokenAddress(
+            nftMint,
+            user,
+            false, // allowOwnerOffCurve
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
+        const rewardTokenMint = await getRewardTokenMint();
+
+        const _signature = await program.methods
+            .withdrawTokens()
+            .accounts({
+                user: user,
+                tokenMint: new PublicKey(rewardTokenMint),
+                nftMintAddress: nftMint,
+                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                userNftTokenAccount: _userNFTTokenAccount
+            })
+            .instruction();
+
+        const tx = new Transaction();
+        tx.add(_signature);
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // update tx status
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+
+        return {
+            serializedTx: serializedTx.toString("base64"),
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
+
+    } catch (error) {
+        console.error(`Error requesting transaction to withdraw tokens:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_ERROR_CODE
+        }
+    }
+}
 
 /**
  * Request a transaction to claim w credits
@@ -672,6 +891,91 @@ export const requestTransactionDepositTokens = async (signature: string): Promis
         }
     }
 }
+/**
+ * Request a transaction to deposit tokens
+ * @param signature - The signature of the deposit tokens message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionStakeTokens = async (signature: string): Promise<RequestTransactionResponse> => {
+    try {
+        const { isValid, message } = await verifyTransactionSignature(signature);
+        if (!isValid || !message) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_INVALID_SIGNATURE_ERROR_CODE
+            };
+        }
+        const data = await processMessageData('stake-tokens', message);
+        if (!data) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_INVALID_DATA_ERROR_CODE
+            };
+        }
+        const { walletAddress, solanaAssetId, amount, nonce } = data;
+        // validate signature status
+        const { isValid: isValidSignature, code: codeSignature } = await validateAndUpdateSignatureStatus(nonce, signature);
+        if (!isValidSignature) {
+            return {
+                serializedTx: null,
+                error: true,
+                code: codeSignature
+            };
+        }
+        const connection = getSolanaConnection();
+        const program = await StakeSystemManager.getInstance();
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(solanaAssetId);
+        const userNFTTokenAccount = await getAssociatedTokenAddress(
+            nftMint,
+            user,
+            false, // allowOwnerOffCurve
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const rewardTokenMint = await getRewardTokenMint();
+
+        const ix = await program.methods
+            .depositTokens(new BN(amount * 1000000))
+            .accounts({
+                user: user,
+                tokenMint: new PublicKey(rewardTokenMint),
+                nftMintAddress: nftMint,
+                tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                userNftTokenAccount: userNFTTokenAccount
+            })
+            .instruction();
+
+        const tx = new Transaction();
+        tx.add(ix);
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.feePayer = user;
+
+        // serialize tx
+        const serializedTx = tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // update the status of the transaction
+        await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+
+        return {
+            serializedTx: serializedTx.toString("base64"),
+            error: false,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE
+        }
+    } catch (error) {
+        console.error(`Error requesting transaction to deposit tokens:`, error);
+        return {
+            serializedTx: null,
+            error: true,
+            code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_DEPOSIT_TOKENS_ERROR_CODE
+        }
+    }
+}
 
 /**
  * Request to update reward contract
@@ -722,15 +1026,15 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         let txBase64ClaimLostTokens: string | null = null;
         if (status === 'claim_and_init_nfnode') {
             txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
-        if (!txBase64ClaimLostTokens) {
-            return {
-                txBase64InitializeNFNode: null,
-                txBase64ClaimLostTokens: null,
-                error: true,
-                code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_CLAIM_LOST_TOKENS_ERROR_CODE
+            if (!txBase64ClaimLostTokens) {
+                return {
+                    txBase64InitializeNFNode: null,
+                    txBase64ClaimLostTokens: null,
+                    error: true,
+                    code: REQUEST_TRANSACTION_ERROR_CODES.FAILED_TO_PREPARE_TX_TO_CLAIM_LOST_TOKENS_ERROR_CODE
+                }
             }
         }
-          }
         // prepare transaction to initialize NFNode
         const txBase64InitializeNFNode = await prepareTransactionToInitializeNFNode({
             walletOwnerAddress: userWallet,
