@@ -20,6 +20,41 @@ import * as anchor from "@coral-xyz/anchor";
 import { MINIMUM_REMAINING_SOLANA_BALANCE } from "@constants/solana/solana.constants";
 import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 
+export const simulateUpdateContractTransactions = async (
+    { walletAddress,
+        nftMintAddress,
+        nfnodeType
+    }: SimulateInitNfnodeParams
+): Promise<SimulationResult> => {
+    const result1 = await simulateClaimWCreditsTransaction(walletAddress);
+    const result2 = await simulateInitializeNfnodeTransaction({
+        walletAddress,
+        nftMintAddress,
+        nfnodeType
+    });
+    const user = new PublicKey(walletAddress);
+    const connection = getSolanaConnection();
+    // get user balance
+    const userBalance = await connection.getBalance(user);
+    return {
+        feeInLamports: result1.feeInLamports + result2.feeInLamports,
+        feeInSol: result1.feeInSol + result2.feeInSol,
+        success: result1.success && result2.success,
+        error: result1.error || result2.error,
+        code: result1.code || result2.code,
+        details: {
+            hasEnoughBalance: userBalance > (result1.details?.requiredBalance ?? 0) + (result2.details?.requiredBalance ?? 0),
+            userBalance: result1.details?.userBalance || result2.details?.userBalance || 0,
+            requiredBalance: (result1.details?.requiredBalance ?? 0) + (result2.details?.requiredBalance ?? 0),
+            minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE / LAMPORTS_PER_SOL,
+            breakdown: {
+                transactionFee: result1.feeInLamports + result2.feeInLamports,
+                claimEntryRent: result1.details?.breakdown?.claimEntryRent || result2.details?.breakdown?.claimEntryRent,
+                userTokenAccountRent: result1.details?.breakdown?.userTokenAccountRent || result2.details?.breakdown?.userTokenAccountRent,
+            }
+        }
+    };
+};
 export const simulateClaimWCreditsTransaction = async (
     walletAddress: string,
 ): Promise<SimulationResult> => {
@@ -69,8 +104,8 @@ export const simulateClaimWCreditsTransaction = async (
                 // get last blockhash
                 const { blockhash } = await connection.getLatestBlockhash();
 
-                 // Convert SOL to microLamports per compute unit
-                 const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+                // Convert SOL to microLamports per compute unit
+                const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
 
                 // create transaction message
                 const messageV0 = new TransactionMessage({
@@ -205,11 +240,11 @@ export const simulateInitializeNfnodeTransaction = async (
         nfnodeType
     }: SimulateInitNfnodeParams): Promise<SimulationResult> => {
     return simulationCache.getOrExecute(
-        { 
-            type: 'initialize_nfnode', 
-            walletAddress, 
-            nftMintAddress, 
-            nfnodeType 
+        {
+            type: 'initialize_nfnode',
+            walletAddress,
+            nftMintAddress,
+            nfnodeType
         },
         async () => {
             try {
@@ -314,7 +349,7 @@ export const simulateInitializeNfnodeTransaction = async (
 
                 // Get user's current balance
                 const userBalance = await connection.getBalance(user);
-                
+
                 // Calculate rent exempt for nfnode entry
                 const nfnodeEntryRent = await connection.getMinimumBalanceForRentExemption(165);
 
@@ -393,13 +428,13 @@ export const simulateInitializeNfnodeTransaction = async (
 };
 export const simulateInitializeStakeTransaction = async (
     { walletAddress,
-        nftMintAddress,amount
+        nftMintAddress, amount
     }: SimulateInitStakeParams): Promise<SimulationResult> => {
     return simulationCache.getOrExecute(
-        { 
-            type: 'initialize_stake', 
-            walletAddress, 
-            nftMintAddress, 
+        {
+            type: 'initialize_stake',
+            walletAddress,
+            nftMintAddress,
         },
         async () => {
             try {
@@ -468,7 +503,7 @@ export const simulateInitializeStakeTransaction = async (
                 } as const;
 
                 const initializeNfnodeIx = await program.methods
-                    .initializeNfnode(new BN(amount*1000000))
+                    .initializeNfnode(new BN(amount * 1000000))
                     .accounts(accounts)
                     .instruction();
 
@@ -498,7 +533,7 @@ export const simulateInitializeStakeTransaction = async (
 
                 // Get user's current balance
                 const userBalance = await connection.getBalance(user);
-                
+
                 // Calculate rent exempt for nfnode entry
                 const nfnodeEntryRent = await connection.getMinimumBalanceForRentExemption(165);
 
@@ -583,12 +618,12 @@ export const simulateClaimRewardTransaction = async (
     claimerType: 'owner' | 'other'
 ): Promise<SimulationResult> => {
     return simulationCache.getOrExecute(
-        { 
-            type: 'claim_reward', 
-            walletAddress, 
-            amountToClaim, 
-            nftMintAddress, 
-            claimerType 
+        {
+            type: 'claim_reward',
+            walletAddress,
+            amountToClaim,
+            nftMintAddress,
+            claimerType
         },
         async () => {
             try {
@@ -623,13 +658,13 @@ export const simulateClaimRewardTransaction = async (
                 const nonce = new BN(Date.now());
 
                 // prepare accounts
-                const accounts = await prepareAccountsToClaimReward({ 
-                    program, 
-                    mint, 
-                    userWallet: user, 
-                    nftMint, 
-                    claimerType, 
-                    adminKeypair 
+                const accounts = await prepareAccountsToClaimReward({
+                    program,
+                    mint,
+                    userWallet: user,
+                    nftMint,
+                    claimerType,
+                    adminKeypair
                 });
 
                 if (!accounts) {
@@ -699,9 +734,9 @@ export const simulateClaimRewardTransaction = async (
                     : 0;
 
                 // calculate the total required balance
-                const requiredBalance = feeInLamports + 
-                    rentExemptRewardEntry + 
-                    userTokenAccountRent + 
+                const requiredBalance = feeInLamports +
+                    rentExemptRewardEntry +
+                    userTokenAccountRent +
                     MINIMUM_REMAINING_SOLANA_BALANCE +
                     priorityFeeInSol;
 

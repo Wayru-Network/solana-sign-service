@@ -1,9 +1,14 @@
 import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
-import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeStakeTransaction } from "@services/request-transaction/simulate-request-tx.service";
+import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeStakeTransaction, simulateUpdateContractTransactions } from "@services/request-transaction/simulate-request-tx.service";
 import { WalletAddressBody } from "@interfaces/request-transaction/api";
 import { SimulateInitNfnodeParams, SimulateInitStakeParams } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
 
 export class SimulateRequestTxController {
+    static async simulateUpdateRewardContract(ctx: CtxSimulateInitNfnode) {
+        const body = ctx?.request?.body as SimulateInitNfnodeParams;
+        const result = await simulateUpdateContractTransactions(body)
+        return ctx.body = result
+    }
     static async simulateClaimWCredits(ctx: CtxWalletAddress) {
         const { walletAddress } = ctx?.request?.body as WalletAddressBody;
         const result = await simulateClaimWCreditsTransaction(walletAddress);
