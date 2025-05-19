@@ -21,6 +21,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-initialize-stake',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.initializeStake(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-add-host-to-nfnode',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.addHostToNfnode(ctx);
@@ -42,9 +49,30 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-withdraw-staked-tokens',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawStakedTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-deposit-tokens',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.depositTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-stake-tokens',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.stakeTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-update-reward-contract',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.updateRewardContract(ctx);
     }
   }
 ];

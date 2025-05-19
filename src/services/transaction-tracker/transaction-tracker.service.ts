@@ -89,7 +89,11 @@ export const updateTransactionTrackerStatus = async (nonce: number, status: Cifr
     return document as TransactionTracker | null;
 }
 
-export const validateAndUpdateSignatureStatus = async (nonce: number, signature: string) => {
+export const validateAndUpdateSignatureStatus = async (
+    nonce: number,
+    signature: string,
+    disabledValidateExpiration: boolean = false
+) => {
     // Start transaction
     try {
         await db.query('BEGIN');
@@ -114,7 +118,7 @@ export const validateAndUpdateSignatureStatus = async (nonce: number, signature:
         const document = result.rows[0];
 
         // Verify expiration
-        if (moment(document.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'))) {
+        if (!disabledValidateExpiration && moment(document.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'))) {
             // update the status of the transaction
             await updateTransactionTrackerStatus(nonce, 'request_expired');
             return {

@@ -48,3 +48,10 @@ export const getSolanaPriorityFee = async () => {
     const fee = Number(key?.value) || 0.00001;
     return fee;
 }
+
+export const getStakeSystemProgramId = async () => {
+    const key = await getKeyByName('BOOST_STAKE_PROGRAM_ID');
+    const id = key?.value || ENV.DEFAULT_STAKE_SYSTEM_PROGRAM_ID;
+    // remove all spaces
+    return id.replace(/\s/g, '');
+}
