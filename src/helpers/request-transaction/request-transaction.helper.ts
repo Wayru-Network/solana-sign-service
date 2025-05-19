@@ -5,7 +5,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema } from "@validations/request-transaction/request-transaction.validation";
+import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema } from "@validations/request-transaction/request-transaction.validation";
 import nacl from 'tweetnacl';
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
@@ -184,6 +184,9 @@ export const processMessageData = async <T extends MessageType>(type: T, message
             case 'initialize-nfnode':
                 await initializeNfnodeSchema.validate(data);
                 return data;
+            case 'initialize-stake':
+                await initializeStakeSchema.validate(data);
+                return data;
             case 'add-host-to-nfnode':
                 await updateHostSchema.validate(data);
                 return data;
@@ -195,6 +198,9 @@ export const processMessageData = async <T extends MessageType>(type: T, message
                 return data;
             case 'deposit-tokens':
                 await depositTokensSchema.validate(data);
+                return data;
+            case 'stake-tokens':
+                await stakeTokensSchema.validate(data);
                 return data;
             case 'update-reward-contract':
                 await updateRewardContractSchema.validate(data);

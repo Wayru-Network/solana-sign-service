@@ -6,6 +6,11 @@ export interface SimulateInitNfnodeParams {
     nftMintAddress: string;
     nfnodeType: NFNodeType
 }
+export interface SimulateInitStakeParams {
+    walletAddress: string;
+    nftMintAddress: string;
+    amount: number;
+}
 
 export interface SimulationResult {
     feeInLamports: number;
