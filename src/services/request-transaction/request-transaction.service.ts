@@ -721,7 +721,7 @@ export const requestTransactionToUpdateRewardContract = async (signature: string
         // prepare transaction to claim lost tokens
         let txBase64ClaimLostTokens: string | null = null;
         if (status === 'claim_and_init_nfnode') {
-            txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet, nonce);
+            txBase64ClaimLostTokens = await prepareTransactionToClaimLostTokens(userWallet);
         if (!txBase64ClaimLostTokens) {
             return {
                 txBase64InitializeNFNode: null,

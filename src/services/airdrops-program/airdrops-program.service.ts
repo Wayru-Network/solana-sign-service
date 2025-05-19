@@ -8,9 +8,10 @@ import { getSolanaConnection } from "@services/solana/solana.connection";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { convertToTokenAmount } from "@services/solana/solana.service";
+import moment from "moment";
 
 
-export const prepareTransactionToClaimLostTokens = async (userWallet: PublicKey, nonce: number): Promise<string | null> => {
+export const prepareTransactionToClaimLostTokens = async (userWallet: PublicKey): Promise<string | null> => {
     try {
          // get program 
          const program = await AirdropsSystemManager.getInstance();
@@ -26,8 +27,13 @@ export const prepareTransactionToClaimLostTokens = async (userWallet: PublicKey,
  
          // amount to claim
          const amount = new BN(convertToTokenAmount(amountToClaim));
+         const { nonce, isValid } = generateSafeNonce();
+         if (!isValid || !nonce) {
+            return null;
+         }
+         
          const ix = await program.methods
-             .claimTokens(amount, new BN(new Date().getTime()))
+             .claimTokens(amount, new BN(nonce))
              .accounts({
                  userAdmin: adminKeypair.publicKey,
                  user: user,
@@ -56,5 +62,36 @@ export const prepareTransactionToClaimLostTokens = async (userWallet: PublicKey,
     } catch (error) {
         console.error('Error preparing transaction to claim lost tokens:', error);
         return null;
+    }
+}
+
+
+// Auxiliary function to determine if we are in the grace period
+const isInvalidNonceTimestamp = (date: moment.Moment): boolean => {
+    const hour = date.utc().hours()
+    const minutes = date.utc().minutes()
+    // If it is 00:00 to 00:02 UTC
+    return hour === 0 && minutes < 2
+}
+
+// Generate nonce with grace period
+export const generateSafeNonce = (): {
+    nonce: number | undefined
+    isValid: boolean
+} => {
+    // Use UTC time for nonce generation
+    const now = moment().utc()
+
+
+    if (isInvalidNonceTimestamp(now)) {
+        return {
+            nonce: undefined,
+            isValid: false
+        }
+    }
+
+    return {
+        nonce: parseInt(now.format('YYYYMMDD')),
+        isValid: true
     }
 }
