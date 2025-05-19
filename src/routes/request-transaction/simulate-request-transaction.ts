@@ -32,6 +32,20 @@ const routes: Route[] = [
     handler: async (ctx: CtxSimulateInitStake) => {
       await SimulateRequestTxController.simulateInitializeStake(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/simulate-stake',
+    handler: async (ctx: CtxSimulateInitStake) => {
+      await SimulateRequestTxController.simulateStake(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/simulate-unstake',
+    handler: async (ctx: CtxSimulateInitStake) => {
+      await SimulateRequestTxController.simulateUnstake(ctx);
+    }
   }
   ,
   {
