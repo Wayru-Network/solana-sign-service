@@ -21,7 +21,7 @@ const routes: Route[] = [
   },
   {
     method: 'post',
-    path: '/simulate-initialize-nfnode',
+    path: '/simulate-initialize-stake',
     handler: async (ctx: CtxSimulateInitStake) => {
       await SimulateRequestTxController.simulateInitializeStake(ctx);
     }

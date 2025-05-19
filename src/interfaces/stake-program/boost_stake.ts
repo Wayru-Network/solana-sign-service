@@ -1423,7 +1423,7 @@ export type BoostStake = {
     {
       "code": 6015,
       "name": "invalidDepositAmount",
-      "msg": "Deposit amount must be >0 and <=100000."
+      "msg": "Deposit amount must be > 0"
     },
     {
       "code": 6016,
@@ -1507,61 +1507,12 @@ export type BoostStake = {
         "kind": "struct",
         "fields": [
           {
-            "name": "ownerLastClaimedTimestamp",
-            "type": "i64"
-          },
-          {
-            "name": "host",
-            "type": "pubkey"
-          },
-          {
-            "name": "hostShare",
-            "type": "u64"
-          },
-          {
-            "name": "hostLastClaimedTimestamp",
-            "type": "i64"
-          },
-          {
-            "name": "manufacturer",
-            "type": "pubkey"
-          },
-          {
-            "name": "manufacturerLastClaimedTimestamp",
-            "type": "i64"
-          },
-          {
             "name": "depositAmount",
             "type": "u64"
           },
           {
             "name": "depositTimestamp",
             "type": "i64"
-          },
-          {
-            "name": "nfnodeType",
-            "type": {
-              "defined": {
-                "name": "nfNodeType"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "nfNodeType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "don"
-          },
-          {
-            "name": "byod"
-          },
-          {
-            "name": "wayruHotspot"
           }
         ]
       }
