@@ -771,7 +771,7 @@ export const requestTransactionWithdrawStakedTokens = async (
     const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
     const rewardTokenMint = await getRewardTokenMint();
 
-    const _signature = await program.methods
+    const ix = await program.methods
       .withdrawTokens()
       .accounts({
         user: user,
@@ -783,7 +783,18 @@ export const requestTransactionWithdrawStakedTokens = async (
       .instruction();
 
     const tx = new Transaction();
-    tx.add(_signature);
+
+    // add priority fee
+    const priorityFeeInSol = await getSolanaPriorityFee();
+    // Convert SOL to microLamports per compute unit
+    const microLamportsPerComputeUnit = Math.floor(priorityFeeInSol * 1_000_000);
+
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: microLamportsPerComputeUnit,
+      }),
+      ix
+    );
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = user;
 
@@ -975,7 +986,6 @@ export const requestTransactionDepositTokens = async (
       .instruction();
 
     const tx = new Transaction();
-    tx.add(ix);
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = user;
 
@@ -1063,7 +1073,20 @@ export const requestTransactionStakeTokens = async (
       .instruction();
 
     const tx = new Transaction();
-    tx.add(ix);
+    // add priority fee
+    const priorityFeeInSol = await getSolanaPriorityFee();
+    // Convert SOL to microLamports per compute unit
+    const microLamportsPerComputeUnit = Math.floor(
+      priorityFeeInSol * 1_000_000
+    );
+
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: microLamportsPerComputeUnit,
+      }),
+      ix
+    );
+
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = user;
 
@@ -1138,7 +1161,11 @@ export const requestTransactionToUpdateRewardContract = async (
     // validate signature status
     const disabledValidateExpiration = status === "only_init_nfnode";
     const { isValid: isValidSignature, code: codeSignature } =
-      await validateAndUpdateSignatureStatus(nonce, signature, disabledValidateExpiration);
+      await validateAndUpdateSignatureStatus(
+        nonce,
+        signature,
+        disabledValidateExpiration
+      );
     if (!isValidSignature) {
       return {
         txBase64InitializeNFNode: null,

@@ -278,6 +278,7 @@ export const simulateClaimWCreditsTransaction = async (
     }
   );
 };
+
 export const simulateStakeTransaction = async (
     { walletAddress,
         nftMintAddress, amount
@@ -463,6 +464,7 @@ export const simulateStakeTransaction = async (
         }
     );
 };
+
 export const simulateUnstakeTransaction = async (
     { walletAddress,
         nftMintAddress
