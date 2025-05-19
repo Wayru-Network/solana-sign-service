@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { ENV } from "@config/env/env";
 import { getSolanaConnection } from "../solana.connection";
 import { getKeyPairFromUnit8Array, getStakeSystemProgramId } from "@helpers/solana/solana.helpers";
-import { StakeProgram } from "@interfaces/stake-program/stake_program";
+import { BoostStake } from "@interfaces/stake-program/boost_stake";
 /**
  * - This class is used to manage the reward system program
  * - It is a singleton class that can be used to get the instance of the reward system program
@@ -10,10 +10,10 @@ import { StakeProgram } from "@interfaces/stake-program/stake_program";
  * - You can no use it to make transactions because it is only for reading states of the program
  */
 export class StakeSystemManager {
-    private static instance: anchor.Program<StakeProgram> | null = null;
+    private static instance: anchor.Program<BoostStake> | null = null;
     private static isInitializing: boolean = false;
 
-    static async getInstance(): Promise<anchor.Program<StakeProgram>> {
+    static async getInstance(): Promise<anchor.Program<BoostStake>> {
         if (StakeSystemManager.instance) {
             return StakeSystemManager.instance;
         }
@@ -51,7 +51,7 @@ export class StakeSystemManager {
             StakeSystemManager.instance = await anchor.Program.at(
                 programId,
                 provider
-            ) as anchor.Program<StakeProgram>;
+            ) as anchor.Program<BoostStake>;
 
             console.log('✅ Stake System Program initialized');
             return StakeSystemManager.instance;
