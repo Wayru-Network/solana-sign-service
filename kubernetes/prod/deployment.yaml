@@ -39,6 +39,8 @@ spec:
               value: EqeqjHyJTsmnVFCs3rnUEKSgvYBtjXa5ujJueiexWLHp
             - name: DEFAULT_AIRDROPS_PROGRAM_ID
               value: 9xQcf54GAkeU8pGPoE7A6twxcBgWjUsARCzBfEXHEq7S
+            - name: DEFAULT_STAKE_SYSTEM_PROGRAM_ID
+              value: 2W41afA7PC45mmmbDfsBanKr2s4ac8EPJLrL1DKdxLj9
             - name: ADMIN_REWARD_SYSTEM_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:

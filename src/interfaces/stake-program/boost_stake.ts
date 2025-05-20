@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/boost_stake.json`.
  */
 export type BoostStake = {
-  "address": "99t6AKZvfjptCC4ahbf6YDBmWNUYnyhzfCiX57bLv45k",
+  "address": "2W41afA7PC45mmmbDfsBanKr2s4ac8EPJLrL1DKdxLj9",
   "metadata": {
     "name": "boostStake",
     "version": "0.1.0",
@@ -170,6 +170,7 @@ export type BoostStake = {
         },
         {
           "name": "adminAccount",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -484,6 +485,7 @@ export type BoostStake = {
         },
         {
           "name": "adminAccount",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -796,7 +798,7 @@ export type BoostStake = {
         },
         {
           "name": "program",
-          "address": "99t6AKZvfjptCC4ahbf6YDBmWNUYnyhzfCiX57bLv45k"
+          "address": "2W41afA7PC45mmmbDfsBanKr2s4ac8EPJLrL1DKdxLj9"
         },
         {
           "name": "programData"
@@ -1064,6 +1066,7 @@ export type BoostStake = {
         },
         {
           "name": "adminAccount",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1423,7 +1426,7 @@ export type BoostStake = {
     {
       "code": 6015,
       "name": "invalidDepositAmount",
-      "msg": "Deposit amount must be > 0"
+      "msg": "Deposit amount must be > 0 and total staked <= 100000000000."
     },
     {
       "code": 6016,
@@ -1497,6 +1500,10 @@ export type BoostStake = {
             "type": {
               "vec": "pubkey"
             }
+          },
+          {
+            "name": "totalValueLocked",
+            "type": "u64"
           }
         ]
       }
