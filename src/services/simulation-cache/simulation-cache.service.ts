@@ -52,9 +52,12 @@ class SimulationCache {
    * Remove expired entries from the cache
    */
   private cleanup(): void {
+    
     const now = Date.now();
+    if (this.cache.size > 0) {
+      console.log(`🧹 Cleaning ${this.cache.size} entries up rate limiter cache:`);
+    }
     for (const [key, entry] of this.cache.entries()) {
-        console.log('🧹 Cleaning up rate limiter cache:', key);
       if (now - entry.timestamp >= this.ttl) {
         this.cache.delete(key);
       }
@@ -74,11 +77,9 @@ class SimulationCache {
     const cached = this.cache.get(key);
 
     if (cached && this.isValid(cached) && !ENV.DISABLED_SIMULATION_CACHE) {
-      console.log('Simulation found in cache:', key);
       return cached.data as T;
     }
 
-    console.log('Simulation not found in cache:', key);
     const result = await simulationFn();
     
     this.cache.set(key, {
