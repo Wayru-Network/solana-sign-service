@@ -986,6 +986,8 @@ export const requestTransactionDepositTokens = async (
       .instruction();
 
     const tx = new Transaction();
+    // add ix to tx
+    tx.add(ix);
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = user;
 
