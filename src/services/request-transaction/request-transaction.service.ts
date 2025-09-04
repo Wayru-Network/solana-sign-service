@@ -21,6 +21,7 @@ import {
 } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  createTransferInstruction,
   getAssociatedTokenAddress,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
@@ -532,6 +533,8 @@ export const requestTransactionToUpdateHost = async (
       paymentToAddHostToNFnode,
       solanaWalletAddressAdmin,
       solanaTreasuryWalletAddress,
+      solanaWayruFeeTransactionAddress,
+      wayruFeeTransaction,
       nonce,
       hostShare,
     } = data;
@@ -564,6 +567,28 @@ export const requestTransactionToUpdateHost = async (
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
     const transaction = new Transaction();
+    const WAYRU_MINT_ADDRESS = await getRewardTokenMint();
+
+    // create instruction to pay wayru network fee
+    const fromTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(WAYRU_MINT_ADDRESS),
+      new PublicKey(walletOwnerAddress),
+      false,
+      TOKEN_PROGRAM_ID,
+    )
+    const WayruFeeWalletTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(WAYRU_MINT_ADDRESS),
+      new PublicKey(solanaWayruFeeTransactionAddress),
+      false,
+      TOKEN_PROGRAM_ID,
+    )
+    const treasureWalletTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(WAYRU_MINT_ADDRESS),
+      new PublicKey(solanaTreasuryWalletAddress),
+      false,
+      TOKEN_PROGRAM_ID,
+    )
+
 
     // add transfer instruction
     // Add SOL transfers
@@ -571,14 +596,23 @@ export const requestTransactionToUpdateHost = async (
       SystemProgram.transfer({
         fromPubkey: ownerAddress,
         toPubkey: new PublicKey(solanaWalletAddressAdmin),
-        lamports: Math.round(feeToUpdateMetadata * LAMPORTS_PER_SOL),
+        lamports: Math.round(feeToUpdateMetadata * LAMPORTS_PER_SOL), // payment to admin for updating metadata
       }),
-      SystemProgram.transfer({
-        fromPubkey: ownerAddress,
-        toPubkey: new PublicKey(solanaTreasuryWalletAddress),
-        lamports: Math.round(paymentToAddHostToNFnode * LAMPORTS_PER_SOL),
-      })
+      createTransferInstruction(
+        fromTokenAccount,
+        treasureWalletTokenAccount,
+        new PublicKey(walletOwnerAddress),
+        Math.round(paymentToAddHostToNFnode * Math.pow(10, 6)) // payment to treasury wallet for adding host
+      ),
+      createTransferInstruction(
+        fromTokenAccount,
+        WayruFeeWalletTokenAccount,
+        new PublicKey(walletOwnerAddress),
+        Math.round(wayruFeeTransaction * Math.pow(10, 6)) // payment fee to wayru fee wallet to make the tx
+      )
     );
+
+    console.log('instructions to pay network fee')
 
     // create the tx for the user
     const updateNfnodeIx = await program.methods

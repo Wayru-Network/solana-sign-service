@@ -68,7 +68,9 @@ export const updateHostSchema = yup.object().shape({
   paymentToAddHostToNFnode: yup.number().required('Payment to add host to NFNode is required').positive('Payment must be positive'),
   solanaWalletAddressAdmin: yup.string().required('Solana wallet address admin is required'),
   solanaTreasuryWalletAddress: yup.string().required('Solana treasury wallet address is required'),
-  hostShare: yup.number().required('Host share is required').positive('Host share must be positive').max(99, 'Host share must not be greater than 99')
+  hostShare: yup.number().required('Host share is required').positive('Host share must be positive').max(99, 'Host share must not be greater than 99'),
+  solanaWayruFeeTransactionAddress: yup.string().required('solana wayru fee transaction address is required'),
+  wayruFeeTransaction: yup.number().required('Wayru fee transaction is required').positive('Payment must be positive'),
 
 });
 
