@@ -1,11 +1,21 @@
 import { getKeyPairFromUnit8Array, getRewardTokenMint } from "@/helpers/solana/solana.helpers";
 import { ENV } from "@config/env/env";
+<<<<<<< HEAD
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAccount, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getSolanaConnection } from "./solana.connection";
 import { getKeyByName } from "@services/keys/keys-queries";
 import { getAssetsPrice } from "@services/assets/assets.service";
 import { AssetInfoOutput } from "@interfaces/assets/assets.interface";
+=======
+import { RewardSystem } from "@interfaces/reward-system-program/reward_system";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { AirdropsProgram } from "@interfaces/airdrops-program/airdrops_program";
+import { getAirdropsProgramId, getRewardSystemProgramId } from "@helpers/solana/solana.helpers";
+import { getSolanaConnection } from "./solana.connection";
+import { getKeyByName } from "@services/keys/keys-queries";
+>>>>>>> 65c5ceb214356ed4ef81b8e7c9c2ad93a3949f69
 
 
 export const getUserNFTTokenAccount = async (
@@ -38,6 +48,7 @@ export const getAdminKeypair = () => {
 export const getMinimumRemainingSolanaBalance = async () => {
   const key = await getKeyByName('MINIMUM_REMAINING_SOLANA_BALANCE_IN_SOL')
   return key?.value ? Number(key.value) * LAMPORTS_PER_SOL : 0.02 * LAMPORTS_PER_SOL;
+<<<<<<< HEAD
 }
 
 /**
@@ -162,4 +173,6 @@ const getWAYRUBalance = async (address: string): Promise<number> => {
 export const getWayruFoundationWalletAddress = async () => {
   const solanaWayruNetworkFeeWalletAddress = await getKeyByName('WAYRU_FOUNDATION_WALLET_ADDRESS')
   return solanaWayruNetworkFeeWalletAddress?.value ?? 'EgnzEnm2yKRg2wk7cdqtXTt9YKKKSSaqLZbchdX2mPAW'
+=======
+>>>>>>> 65c5ceb214356ed4ef81b8e7c9c2ad93a3949f69
 }

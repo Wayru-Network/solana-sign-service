@@ -1398,7 +1398,6 @@ export const simulateClaimRewardTransaction = async (
         const requiredBalanceFormatted = Number(
           requiredBalanceInSol.toFixed(9)
         );
-
         const hasEnoughBalance = userBalanceInSol >= requiredBalanceFormatted;
 
         // 1. Get the token storage account address (already in accounts.tokenStorageAccount)
