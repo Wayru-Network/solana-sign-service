@@ -35,6 +35,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-add-host-to-nfnode-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.addHostToNfnodeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-claim-w-credits',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.claimWCredits(ctx);
@@ -74,7 +81,14 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.updateRewardContract(ctx);
     }
-  }
+  },
+  {
+    method: 'post',
+    path: '/to-initialize-nfnode-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.initializeNfnodeV2(ctx);
+    }
+  },
 ];
 
 // Register all routes automatically

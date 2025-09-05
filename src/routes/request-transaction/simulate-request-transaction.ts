@@ -28,6 +28,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/simulate-initialize-nfnode-v2',
+    handler: async (ctx: CtxSimulateInitNfnode) => {
+      await SimulateRequestTxController.simulateInitializeNfnodeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/simulate-initialize-stake',
     handler: async (ctx: CtxSimulateInitStake) => {
       await SimulateRequestTxController.simulateInitializeStake(ctx);

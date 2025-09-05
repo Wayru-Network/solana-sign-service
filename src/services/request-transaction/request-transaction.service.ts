@@ -11,6 +11,7 @@ import {
 import {
   getKeyPairFromUnit8Array,
   getSolanaPriorityFee,
+  getWayruFeeTransaction,
 } from "@helpers/solana/solana.helpers";
 import {
   LAMPORTS_PER_SOL,
@@ -45,6 +46,7 @@ import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system
 import { prepareTransactionToClaimLostTokens } from "@services/airdrops-program/airdrops-program.service";
 import { prepareTransactionToInitializeNFNode } from "@services/rewards-program/rewards-program.service";
 import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
+import { createTransactionToInitializeNfnode } from "./create-request-transaction.service";
 
 /**
  * Request a transaction to initialize a NFNode
@@ -203,6 +205,90 @@ export const requestTransactionToInitializeNfnode = async (
     };
   }
 };
+
+/**
+ * Request a transaction to initialize a NFNode v2, wayru network fee is included
+ * @param {string} signature - The signature of the initialize nfnode message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToInitializeNfnodeV2 = async (
+  signature: string
+): RequestTransactionResponse => {
+  try {
+    // verify the signature
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+
+    const data = await processMessageData("initialize-nfnode", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const {
+      walletOwnerAddress,
+      hostAddress,
+      manufacturerAddress,
+      solanaAssetId,
+      nfnodeType,
+      nonce,
+    } = data;
+
+    // validate signature status
+    const { isValid: isValidSignature, code: codeSignature } =
+      await validateAndUpdateSignatureStatus(nonce, signature);
+    if (!isValidSignature) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: codeSignature,
+      };
+    }
+
+    // Create transaction using the unified function
+    const { error: transactionError, serializedTransaction } = await createTransactionToInitializeNfnode({
+      walletAddress: walletOwnerAddress,
+      nftMintAddress: solanaAssetId,
+      nfnodeType: nfnodeType, // Type assertion to handle the interface mismatch
+      hostAddress,
+      manufacturerAddress,
+      forSimulation: false // This is for real transaction
+    });
+
+    if (transactionError || !serializedTransaction) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+      };
+    }
+
+    // update tx status
+    await updateTransactionTrackerStatus(nonce, "request_authorized_by_admin");
+
+    return {
+      serializedTx: serializedTransaction,
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE,
+    };
+  } catch (error) {
+    console.error(`Error requesting transaction initialize nfnode:`, error);
+    return {
+      serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+    };
+  }
+};
+
 /**
  * Request a transaction to initialize a NFNode stake sntry
  * @param {string} signature - The signature of the initialize nfnode message
@@ -533,6 +619,131 @@ export const requestTransactionToUpdateHost = async (
       paymentToAddHostToNFnode,
       solanaWalletAddressAdmin,
       solanaTreasuryWalletAddress,
+      nonce,
+      hostShare,
+    } = data;
+    // validate signature status
+    const { isValid: isValidSignature, code: codeSignature } =
+      await validateAndUpdateSignatureStatus(nonce, signature);
+    if (!isValidSignature) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: codeSignature,
+      };
+    }
+
+    // prepare transaction parameters
+    const connection = getSolanaConnection();
+    const program = await RewardSystemManager.getInstance();
+    const ownerAddress = new PublicKey(walletOwnerAddress);
+    const nftMint = new PublicKey(solanaAssetId);
+    const adminKeypair = getKeyPairFromUnit8Array(
+      Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string))
+    );
+    const hostWalletAddress = new PublicKey(hostAddress);
+    const bnHostShare = new BN(hostShare);
+    const userNFTTokenAccount = await getAssociatedTokenAddress(
+      nftMint,
+      ownerAddress,
+      false, // allowOwnerOffCurve
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const transaction = new Transaction();
+
+    // add transfer instruction
+    // Add SOL transfers
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: ownerAddress,
+        toPubkey: new PublicKey(solanaWalletAddressAdmin),
+        lamports: Math.round(feeToUpdateMetadata * LAMPORTS_PER_SOL),
+      }),
+      SystemProgram.transfer({
+        fromPubkey: ownerAddress,
+        toPubkey: new PublicKey(solanaTreasuryWalletAddress),
+        lamports: Math.round(paymentToAddHostToNFnode * LAMPORTS_PER_SOL),
+      })
+    );
+
+    // create the tx for the user
+    const updateNfnodeIx = await program.methods
+      .updateNfnode(bnHostShare)
+      .accounts({
+        userAdmin: adminKeypair.publicKey,
+        user: ownerAddress,
+        host: hostWalletAddress,
+        nftMintAddress: nftMint,
+        userNftTokenAccount: userNFTTokenAccount,
+        tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+
+    transaction.add(updateNfnodeIx);
+    transaction.recentBlockhash = (
+      await connection.getLatestBlockhash()
+    ).blockhash;
+    transaction.feePayer = ownerAddress;
+    // admin sign the transaction
+    transaction.partialSign(adminKeypair);
+
+    // serialize tx
+    const serializedTx = transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    // update the status of the transaction
+    await updateTransactionTrackerStatus(nonce, "request_authorized_by_admin");
+
+    return {
+      serializedTx: serializedTx.toString("base64"),
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE,
+    };
+  } catch (error) {
+    return {
+      serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_HOST_ERROR_CODE,
+    };
+  }
+};
+/**
+ * Request a transaction to update the host of a NFNode
+ * @param {string} signature - The signature of the update host message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToUpdateHostV2 = async (
+  signature: string
+): RequestTransactionResponse => {
+  try {
+    // verify the signature
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+    const data = await processMessageData("add-host-to-nfnode", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_UPDATE_NFNODE_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const {
+      walletOwnerAddress,
+      hostAddress,
+      solanaAssetId,
+      feeToUpdateMetadata,
+      paymentToAddHostToNFnode,
+      solanaWalletAddressAdmin,
+      solanaTreasuryWalletAddress,
       solanaWayruFeeTransactionAddress,
       wayruFeeTransaction,
       nonce,
@@ -602,13 +813,19 @@ export const requestTransactionToUpdateHost = async (
         new PublicKey(walletOwnerAddress),
         Math.round(paymentToAddHostToNFnode * Math.pow(10, 6)) // payment to treasury wallet for adding host
       ),
-      createTransferInstruction(
-        fromTokenAccount,
-        WayruFeeWalletTokenAccount,
-        new PublicKey(walletOwnerAddress),
-        Math.round(wayruFeeTransaction * Math.pow(10, 6)) // payment fee to wayru fee wallet to make the tx
-      )
     );
+
+    // if wayruFeeTransaction > 0, add instruction to send wayru token to wayru fee wallet
+    if (wayruFeeTransaction > 0) {
+      transaction.add(
+        createTransferInstruction(
+          fromTokenAccount,
+          WayruFeeWalletTokenAccount,
+          new PublicKey(walletOwnerAddress),
+          Math.round(wayruFeeTransaction * Math.pow(10, 6)) // payment fee to wayru fee wallet to make the tx
+        )
+      );
+    }
 
     // create the tx for the user
     const updateNfnodeIx = await program.methods
@@ -653,6 +870,7 @@ export const requestTransactionToUpdateHost = async (
     };
   }
 };
+
 
 /**
  * Request a transaction to withdraw tokens

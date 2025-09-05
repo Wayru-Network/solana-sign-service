@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionDepositTokens, requestTransactionStakeTokens, requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeStakeEntry, requestTransactionToUpdateHost, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawTokens } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionDepositTokens, requestTransactionStakeTokens, requestTransactionToClaimReward, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawTokens } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -184,6 +184,51 @@ export class RequestTransactionController {
       }
     }
   }
+  static async addHostToNfnodeV2(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionToUpdateHostV2(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error'
+        };
+      }
+    }
+  }
   static async claimWCredits(ctx: CtxSignatureInside) {
     try {
       // validate request body
@@ -327,7 +372,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true  
+        stripUnknown: true
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -373,7 +418,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true  
+        stripUnknown: true
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -430,7 +475,7 @@ export class RequestTransactionController {
         ctx.body = response
       } else {
         ctx.status = 200;
-        ctx.body = response;  
+        ctx.body = response;
       }
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
@@ -448,6 +493,51 @@ export class RequestTransactionController {
           error: true,
           message: 'internal server error',
           code: 'URC-002'
+        };
+      }
+    }
+  }
+  static async initializeNfnodeV2(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionToInitializeNfnodeV2(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error'
         };
       }
     }

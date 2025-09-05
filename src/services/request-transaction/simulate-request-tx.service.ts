@@ -9,14 +9,16 @@ import { BN } from "bn.js";
 import {
   convertToTokenAmount,
   getUserNFTTokenAccount,
+  getSolanaWalletBalance,
   getAdminKeypair,
 } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
 import {
   getKeyPairFromUnit8Array,
   getSolanaPriorityFee,
+  getWayruFeeTransaction,
 } from "@helpers/solana/solana.helpers";
-import {} from "@interfaces/request-transaction/request-transaction.interface";
+import { } from "@interfaces/request-transaction/request-transaction.interface";
 import { SIMULATE_REQUEST_TX_CODES } from "@errors/request-transaction/request-transaction";
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
@@ -30,16 +32,20 @@ import {
   SimulateInitStakeParams,
   SimulateUnstakeParams,
   SimulationResult,
+  SimulationResultV2,
 } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
-import { getNFNodeTypeRecord } from "@helpers/request-transaction/request-transaction.helper";
 import { getSolanaConnection } from "@services/solana/solana.connection";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
 import { simulationCache } from "../simulation-cache/simulation-cache.service";
-import { prepareAccountsToClaimReward } from "@helpers/request-transaction/request-transaction.helper";
+import {
+  getNFNodeTypeRecord,
+  prepareAccountsToClaimReward,
+} from "@helpers/request-transaction/request-transaction.helper";
 import * as anchor from "@coral-xyz/anchor";
 import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 import { getMinimumRemainingSolanaBalance } from "@services/solana/solana.service";
+import { createTransactionToInitializeNfnode } from "./create-request-transaction.service";
 
 export const simulateUpdateContractTransactions = async ({
   walletAddress,
@@ -87,7 +93,8 @@ export const simulateUpdateContractTransactions = async ({
           hasEnoughBalance,
           userBalance: userBalanceInSol,
           requiredBalance: allRequiredBalanceFormatted,
-          minimumRequired: MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL,
+          minimumRequired:
+            MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL,
           breakdown: {
             transactionFee: allTxFee,
             claimEntryRent:
@@ -219,9 +226,8 @@ export const simulateClaimWCreditsTransaction = async (
             feeInLamports,
             feeInSol: requiredBalanceInSol,
             success: false,
-            error: `User must have at least ${
-              MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
-            } SOL left after the transaction.`,
+            error: `User must have at least ${MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
+              } SOL left after the transaction.`,
             code: SIMULATE_REQUEST_TX_CODES.INSUFFICIENT_BALANCE,
             details: {
               hasEnoughBalance,
@@ -405,18 +411,20 @@ export const simulateStakeTransaction = async ({
           userTokenAccountRent +
           MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS;
         const requiredBalanceInSol = requiredBalance / LAMPORTS_PER_SOL;
-        const formattedRequiredBalanceInSol = Number(requiredBalanceInSol.toFixed(9));
+        const formattedRequiredBalanceInSol = Number(
+          requiredBalanceInSol.toFixed(9)
+        );
 
-        const hasEnoughBalance = userBalanceInSol >= formattedRequiredBalanceInSol;
+        const hasEnoughBalance =
+          userBalanceInSol >= formattedRequiredBalanceInSol;
 
         if (!hasEnoughBalance) {
           return {
             feeInLamports,
             feeInSol: requiredBalanceInSol,
             success: false,
-            error: `User must have at least ${
-              MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
-            } SOL left after the transaction.`,
+            error: `User must have at least ${MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
+              } SOL left after the transaction.`,
             code: SIMULATE_REQUEST_TX_CODES.INSUFFICIENT_BALANCE,
             details: {
               hasEnoughBalance,
@@ -599,18 +607,20 @@ export const simulateUnstakeTransaction = async ({
           userTokenAccountRent +
           MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS;
         const requiredBalanceInSol = requiredBalance / LAMPORTS_PER_SOL;
-        const formattedRequiredBalanceInSol = Number(requiredBalanceInSol.toFixed(9));
+        const formattedRequiredBalanceInSol = Number(
+          requiredBalanceInSol.toFixed(9)
+        );
 
-        const hasEnoughBalance = userBalanceInSol >= formattedRequiredBalanceInSol;
+        const hasEnoughBalance =
+          userBalanceInSol >= formattedRequiredBalanceInSol;
 
         if (!hasEnoughBalance) {
           return {
             feeInLamports,
             feeInSol: formattedRequiredBalanceInSol,
             success: false,
-            error: `User must have at least ${
-              MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
-            } SOL left after the transaction.`,
+            error: `User must have at least ${MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS / LAMPORTS_PER_SOL
+              } SOL left after the transaction.`,
             code: SIMULATE_REQUEST_TX_CODES.INSUFFICIENT_BALANCE,
             details: {
               hasEnoughBalance,
@@ -832,8 +842,11 @@ export const simulateInitializeNfnodeTransaction = async ({
           feeInLamports +
           MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS;
         const totalRequiredInSol = totalRequired / LAMPORTS_PER_SOL;
-        const formattedTotalRequiredInSol = Number(totalRequiredInSol.toFixed(9));
-        const hasEnoughBalance = userBalanceInSol >= formattedTotalRequiredInSol;
+        const formattedTotalRequiredInSol = Number(
+          totalRequiredInSol.toFixed(9)
+        );
+        const hasEnoughBalance =
+          userBalanceInSol >= formattedTotalRequiredInSol;
 
         // Simulate transaction
         const simulation = await connection.simulateTransaction(transaction);
@@ -892,6 +905,149 @@ export const simulateInitializeNfnodeTransaction = async ({
           error: error instanceof Error ? error.message : "Unknown error",
           code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
         };
+      }
+    }
+  );
+};
+
+export const simulateInitializeNfnodeTransactionV2 = async ({
+  walletAddress,
+  nftMintAddress,
+  nfnodeType,
+}: SimulateInitNfnodeParams): Promise<SimulationResultV2> => {
+  return simulationCache.getOrExecute(
+    {
+      type: "initialize_nfnode",
+      walletAddress,
+      nftMintAddress,
+      nfnodeType,
+    },
+    async () => {
+      try {
+        const connection = getSolanaConnection();
+        const wayruFeeTransaction = await getWayruFeeTransaction();
+        const nfnodeTypeRecord = getNFNodeTypeRecord(nfnodeType);
+
+        // prepare transaction to initialize nfnode
+        const {
+          transaction,
+          transactionMessage,
+          userTokenAccountRent,
+          error,
+          tokenStorageAccountRent,
+        } = await createTransactionToInitializeNfnode({
+          walletAddress,
+          nftMintAddress,
+          nfnodeType: nfnodeTypeRecord,
+          forSimulation: true, // This is for simulation
+        });
+
+        // check if the transaction is created successfully
+        if (
+          error ||
+          !transaction ||
+          !transactionMessage ||
+          userTokenAccountRent === null ||
+          tokenStorageAccountRent === null
+        ) {
+          return {
+            success: false,
+            error: "Failed to create transaction",
+            code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+          };
+        }
+
+        // Get wallet current balance
+        const { assets } = await getSolanaWalletBalance(walletAddress);
+        const solAsset = assets.find((asset) => asset.name === "SOL");
+        const wayruAsset = assets.find((asset) => asset.name === "WAYRU");
+        const walletSolBalance = Number(solAsset?.balance ?? 0);
+        const walletWayruBalance = Number(wayruAsset?.balance ?? 0);
+        const depositAmount = nfnodeType === "don" ? 0 : 5000;
+
+        // Calculate rent exempt for nfnode entry
+        const nfnodeEntryRent =
+          await connection.getMinimumBalanceForRentExemption(165);
+
+        // Get transaction fee
+        const transactionFee = await connection.getFeeForMessage(
+          transactionMessage
+        );
+        if (transactionFee.value === null) {
+          throw new Error("Failed to get fee for message");
+        }
+        const feeInLamports = transactionFee.value || 0;
+        const MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS =
+          await getMinimumRemainingSolanaBalance();
+
+        // Sum all required lamports
+        const totalRequiredSol =
+          nfnodeEntryRent +
+          userTokenAccountRent +
+          tokenStorageAccountRent +
+          feeInLamports +
+          MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS;
+        const totalRequiredInSol = totalRequiredSol / LAMPORTS_PER_SOL;
+        const formattedTotalRequiredInSol = Number(
+          totalRequiredInSol.toFixed(9)
+        );
+        const hasEnoughSolBalance = walletSolBalance >= formattedTotalRequiredInSol;
+        const requiredBalanceWayru = wayruFeeTransaction + depositAmount;
+        const hasEnoughWayruBalance = walletWayruBalance >= requiredBalanceWayru;
+
+        // Simulate transaction
+        const simulation = await connection.simulateTransaction(transaction);
+
+        const response: SimulationResultV2 = {
+          success: false,
+          error: JSON.stringify(simulation.value.err),
+          code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+          details: {
+            networkFeeInSol: feeInLamports / LAMPORTS_PER_SOL,
+            wayruFeeTransaction: wayruFeeTransaction,
+            hasEnoughSolBalance,
+            hasEnoughWayruBalance: hasEnoughWayruBalance,
+            userBalanceInSol: walletSolBalance,
+            userBalanceInWayru: walletWayruBalance,
+            requiredBalanceInSol: formattedTotalRequiredInSol,
+            requiredBalanceWayru: requiredBalanceWayru,
+            txBase64: undefined,
+            discountCodeError: undefined,
+            breakdown: {
+              totalTransferAmountInSol: formattedTotalRequiredInSol,
+              totalTransferAmountInWayru: requiredBalanceWayru,
+              treasuryPaymentInSol: 0,
+              treasuryPaymentInWayru: wayruFeeTransaction,
+              adminPaymentInSol: 0,
+            },
+          },
+        };
+
+        if (simulation.value.err) {
+          console.log("simulation logs:", simulation.value.logs);
+          return {
+            ...response,
+            success: false,
+            error: JSON.stringify(simulation.value.err),
+            code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+          } as SimulationResultV2;
+        }
+
+        return {
+          success: true,
+          error: JSON.stringify(simulation.value.err),
+          code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+          details: {
+            ...response.details,
+          },
+        } as SimulationResultV2;
+      } catch (error) {
+        console.error("Error in simulateInitializeNfnodeTransaction:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+          code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+        } as SimulationResultV2;
       }
     }
   );
@@ -1226,7 +1382,8 @@ export const simulateClaimRewardTransaction = async (
         const userTokenAccountRent = !userTokenAccountInfo
           ? await connection.getMinimumBalanceForRentExemption(165)
           : 0;
-        const MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS = await getMinimumRemainingSolanaBalance();
+        const MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS =
+          await getMinimumRemainingSolanaBalance();
 
         // calculate the total required balance
         const requiredBalanceInLamports =
@@ -1241,7 +1398,7 @@ export const simulateClaimRewardTransaction = async (
         const requiredBalanceFormatted = Number(
           requiredBalanceInSol.toFixed(9)
         );
-      
+
         const hasEnoughBalance = userBalanceInSol >= requiredBalanceFormatted;
 
         // 1. Get the token storage account address (already in accounts.tokenStorageAccount)
