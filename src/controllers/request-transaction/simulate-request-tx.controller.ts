@@ -1,5 +1,5 @@
 import { CtxSimulateClaimReward, CtxSimulateInitNfnode, CtxSimulateInitStake, CtxSimulateUnstake, CtxWalletAddress, SimulateClaimRewardParams } from "@interfaces/request-transaction/api";
-import { simulateClaimRewardTransaction, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeNfnodeTransactionV2, simulateInitializeStakeTransaction, simulateStakeTransaction, simulateUnstakeTransaction, simulateUpdateContractTransactions } from "@services/request-transaction/simulate-request-tx.service";
+import { simulateClaimRewardTransaction, simulateClaimRewardTransactionV2, simulateClaimWCreditsTransaction, simulateInitializeNfnodeTransaction, simulateInitializeNfnodeTransactionV2, simulateInitializeStakeTransaction, simulateStakeTransaction, simulateUnstakeTransaction, simulateUpdateContractTransactions } from "@services/request-transaction/simulate-request-tx.service";
 import { WalletAddressBody } from "@interfaces/request-transaction/api";
 import { SimulateInitNfnodeParams, SimulateInitStakeParams, SimulateUnstakeParams } from "@interfaces/request-transaction/simulate-request-tx.interfaces";
 
@@ -37,6 +37,11 @@ export class SimulateRequestTxController {
     static async simulateClaimReward(ctx: CtxSimulateClaimReward) {
         const { walletAddress, amountToClaim, nftMintAddress, claimerType } = ctx?.request?.body as SimulateClaimRewardParams;
         const result = await simulateClaimRewardTransaction(walletAddress, amountToClaim, nftMintAddress, claimerType);
+        return ctx.body = result
+    }
+    static async simulateClaimRewardV2(ctx: CtxSimulateClaimReward) {
+        const { walletAddress, amountToClaim, nftMintAddress, claimerType } = ctx?.request?.body as SimulateClaimRewardParams;
+        const result = await simulateClaimRewardTransactionV2(walletAddress, amountToClaim, nftMintAddress, claimerType);
         return ctx.body = result
     }
     static async simulateInitializeNfnodeV2(ctx: CtxSimulateInitNfnode) {

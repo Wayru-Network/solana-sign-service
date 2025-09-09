@@ -61,6 +61,13 @@ const routes: Route[] = [
     handler: async (ctx: CtxSimulateClaimReward) => {
       await SimulateRequestTxController.simulateClaimReward(ctx);
     }
+  },
+  {
+    method: 'post',
+    path: '/simulate-claim-reward-v2',
+    handler: async (ctx: CtxSimulateClaimReward) => {
+      await SimulateRequestTxController.simulateClaimRewardV2(ctx);
+    }
   }
 ];
 

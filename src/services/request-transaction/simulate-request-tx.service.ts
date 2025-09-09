@@ -11,6 +11,7 @@ import {
   getUserNFTTokenAccount,
   getSolanaWalletBalance,
   getAdminKeypair,
+  getWayruFoundationWalletAddress,
 } from "../solana/solana.service";
 import { ENV } from "@config/env/env";
 import {
@@ -45,7 +46,10 @@ import {
 import * as anchor from "@coral-xyz/anchor";
 import { StakeSystemManager } from "@services/solana/contracts/stake-system.manager";
 import { getMinimumRemainingSolanaBalance } from "@services/solana/solana.service";
-import { createTransactionToInitializeNfnode } from "./create-request-transaction.service";
+import {
+  createTransactionToInitializeNfnode,
+  instructionToSendWayruToFoundationWallet,
+} from "./create-request-transaction.service";
 
 export const simulateUpdateContractTransactions = async ({
   walletAddress,
@@ -991,9 +995,11 @@ export const simulateInitializeNfnodeTransactionV2 = async ({
         const formattedTotalRequiredInSol = Number(
           totalRequiredInSol.toFixed(9)
         );
-        const hasEnoughSolBalance = walletSolBalance >= formattedTotalRequiredInSol;
+        const hasEnoughSolBalance =
+          walletSolBalance >= formattedTotalRequiredInSol;
         const requiredBalanceWayru = wayruFeeTransaction + depositAmount;
-        const hasEnoughWayruBalance = walletWayruBalance >= requiredBalanceWayru;
+        const hasEnoughWayruBalance =
+          walletWayruBalance >= requiredBalanceWayru;
 
         // Simulate transaction
         const simulation = await connection.simulateTransaction(transaction);
@@ -1501,6 +1507,273 @@ export const simulateClaimRewardTransaction = async (
           error: error instanceof Error ? error.message : "Unknown error",
           code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
         };
+      }
+    }
+  );
+};
+
+export const simulateClaimRewardTransactionV2 = async (
+  walletAddress: string,
+  amountToClaim: number,
+  nftMintAddress: string,
+  claimerType: "owner" | "other"
+): Promise<SimulationResultV2> => {
+  return simulationCache.getOrExecute(
+    {
+      type: "claim_reward",
+      walletAddress,
+      amountToClaim,
+      nftMintAddress,
+      claimerType,
+    },
+    async () => {
+      try {
+        const program = await RewardSystemManager.getInstance();
+        const connection = getSolanaConnection();
+        const adminKeypair = getKeyPairFromUnit8Array(
+          Uint8Array.from(
+            JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string)
+          )
+        );
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const wayruFeeTransaction = await getWayruFeeTransaction();
+        const wayruFoundationWalletAddress =
+          await getWayruFoundationWalletAddress();
+
+        // validate wallet address
+        try {
+          new PublicKey(walletAddress);
+        } catch (error) {
+          return {
+            feeInLamports: 0,
+            feeInSol: 0,
+            success: false,
+            error: "Invalid wallet address format",
+            code: SIMULATE_REQUEST_TX_CODES.INVALID_WALLET_ADDRESS,
+          } as SimulationResultV2;
+        }
+
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(nftMintAddress);
+
+        // get user balance
+        const { assets } = await getSolanaWalletBalance(walletAddress);
+        const userBalanceInSol = Number(assets.find((asset) => asset.name === "SOL")?.balance ?? 0);
+        const userBalanceInWayru = Number(assets.find((asset) => asset.name === "WAYRU")?.balance ?? 0);
+
+        // prepare transaction parameters
+        const rewardTokenMint = await getRewardTokenMint();
+        const mint = new PublicKey(rewardTokenMint);
+        const amount = new BN(convertToTokenAmount(amountToClaim));
+        const nonce = new BN(Date.now());
+
+        // prepare accounts
+        const accounts = await prepareAccountsToClaimReward({
+          program,
+          mint,
+          userWallet: user,
+          nftMint,
+          claimerType,
+          adminKeypair,
+        });
+
+        if (!accounts) {
+          return {
+            feeInLamports: 0,
+            feeInSol: 0,
+            success: false,
+            error: "Failed to prepare accounts",
+            code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+          } as SimulationResultV2;
+        }
+
+        // create instruction
+        let ix: anchor.web3.TransactionInstruction;
+        if (claimerType === "owner") {
+          ix = await program.methods
+            .ownerClaimRewards(amount, nonce)
+            .accounts(accounts as unknown as any)
+            .instruction();
+        } else {
+          ix = await program.methods
+            .othersClaimRewards(amount, nonce)
+            .accounts(accounts)
+            .instruction();
+        }
+
+        // get last blockhash
+        const { blockhash } = await connection.getLatestBlockhash();
+
+        // Convert SOL to microLamports per compute unit
+        const microLamportsPerComputeUnit = Math.floor(
+          priorityFeeInSol * 1_000_000
+        );
+
+        // create instruction to send wayru token to wayru foundation wallet
+        const ixToSendWayruToFoundationWallet =
+          await instructionToSendWayruToFoundationWallet(
+            user,
+            wayruFeeTransaction
+          );
+        if (!ixToSendWayruToFoundationWallet) {
+          return {
+            feeInLamports: 0,
+            feeInSol: 0,
+            success: false,
+            error:
+              "Failed to create instruction to send wayru token to wayru foundation wallet",
+            code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+          } as SimulationResultV2;
+        }
+
+        // Now create the final transaction with the correct priority fee
+        const finalMessageV0 = new TransactionMessage({
+          payerKey: user,
+          recentBlockhash: blockhash,
+          instructions: [
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: microLamportsPerComputeUnit,
+            }),
+            ixToSendWayruToFoundationWallet,
+            ix,
+          ],
+        }).compileToV0Message();
+
+        // create versioned transaction
+        const transaction = new VersionedTransaction(finalMessageV0);
+        transaction.sign([adminKeypair]);
+
+        // simulate and get fee
+        const fees = await connection.getFeeForMessage(finalMessageV0);
+        const feeInLamports = fees.value || 0;
+
+        // calculate the space needed for the reward entry account
+        const REWARD_ENTRY_SIZE = 8 + 8 + 8; // discriminator + lastClaimedNonce + totalClaimed
+
+        // get rent exempt for the reward entry account
+        const rentExemptRewardEntry =
+          await connection.getMinimumBalanceForRentExemption(REWARD_ENTRY_SIZE);
+
+        // get rent exempt for the token account if it doesn't exist
+        const userTokenAccount = await getAssociatedTokenAddress(
+          new PublicKey(rewardTokenMint),
+          user
+        );
+        const userTokenAccountInfo = await connection.getAccountInfo(
+          userTokenAccount
+        );
+        const userTokenAccountRent = !userTokenAccountInfo
+          ? await connection.getMinimumBalanceForRentExemption(165)
+          : 0;
+        const MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS =
+          await getMinimumRemainingSolanaBalance();
+
+        // calculate the total required balance
+        const requiredBalanceInLamports =
+          feeInLamports +
+          rentExemptRewardEntry +
+          userTokenAccountRent +
+          MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS +
+          priorityFeeInSol * LAMPORTS_PER_SOL;
+        const requiredBalanceInSol =
+          requiredBalanceInLamports / LAMPORTS_PER_SOL;
+
+        const requiredBalanceFormatted = Number(
+          requiredBalanceInSol.toFixed(9)
+        );
+        const hasEnoughBalance = userBalanceInSol >= requiredBalanceFormatted;
+        const hasEnoughWayruBalance = userBalanceInWayru >= wayruFeeTransaction;
+
+        // 1. Get the token storage account address (already in accounts.tokenStorageAccount)
+        const tokenStorageAccount = accounts.tokenStorageAccount;
+
+        // 2. Get the token balance
+        const tokenStorageAccountInfo = await connection.getTokenAccountBalance(
+          tokenStorageAccount
+        );
+        const tokenStorageBalance = Number(
+          tokenStorageAccountInfo.value.amount
+        ); // in smallest unit
+
+        // 3. Compare with amountToClaim (also in smallest unit)
+        const amountToClaimInSmallestUnit = convertToTokenAmount(amountToClaim);
+        const hasEnoughProgramTokens =
+          tokenStorageBalance >= amountToClaimInSmallestUnit;
+
+        const details = {
+          networkFeeInSol: feeInLamports / LAMPORTS_PER_SOL,
+          wayruFeeTransaction: wayruFeeTransaction,
+          hasEnoughSolBalance: hasEnoughBalance,
+          hasEnoughWayruBalance: hasEnoughWayruBalance,
+          userBalanceInSol: userBalanceInSol,
+          userBalanceInWayru: userBalanceInWayru,
+          requiredBalanceInSol: requiredBalanceInSol,
+          requiredBalanceWayru: wayruFeeTransaction,
+          txBase64: undefined,
+          discountCodeError: undefined,
+          breakdown: {
+            totalTransferAmountInSol: requiredBalanceInSol,
+            totalTransferAmountInWayru: wayruFeeTransaction,
+            treasuryPaymentInSol: 0,
+            treasuryPaymentInWayru: wayruFeeTransaction,
+            adminPaymentInSol: 0,
+          }
+        } as SimulationResultV2['details']
+
+
+
+        // 4. Add this info to the response
+        if (!hasEnoughProgramTokens) {
+          return {
+            feeInLamports,
+            feeInSol: requiredBalanceInSol,
+            success: false,
+            error:
+              "Program does not have enough reward tokens to pay the claim.",
+            code: SIMULATE_REQUEST_TX_CODES.PROGRAM_DOES_NOT_HAVE_ENOUGH_REWARD_TOKENS,
+            details
+          } as SimulationResultV2;
+        }
+
+        // simulate transaction
+        const simulationFinal = await connection.simulateTransaction(
+          transaction,
+          {
+            commitment: "confirmed",
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+          }
+        );
+
+
+        if (simulationFinal.value.err) {
+          console.log("simulation logs:", simulationFinal.value.logs);
+          return {
+            feeInLamports,
+            feeInSol: requiredBalanceFormatted,
+            success: false,
+            error: JSON.stringify(simulationFinal.value.err),
+            code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+            details
+          } as SimulationResultV2;
+        }
+
+        return {
+          feeInLamports,
+          feeInSol: requiredBalanceInSol,
+          success: true,
+          code: SIMULATE_REQUEST_TX_CODES.SUCCESS,
+          details
+        } as SimulationResultV2;
+      } catch (error) {
+        console.error("Error simulate claim reward transaction:", error);
+        return {
+          feeInLamports: 0,
+          feeInSol: 0,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+          code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+        } as SimulationResultV2;
       }
     }
   );

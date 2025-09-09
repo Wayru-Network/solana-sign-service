@@ -14,6 +14,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-claim-rewards-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.claimRewardsV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-initialize-nfnode',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.initializeNfnode(ctx);
