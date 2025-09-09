@@ -426,6 +426,153 @@ export const requestTransactionToInitializeStakeEntry = async (
 };
 
 /**
+ * Request a transaction to initialize a NFNode stake entry v2, wayru network fee is included
+ * @param {string} signature - The signature of the initialize nfnode message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToInitializeStakeEntryV2 = async (
+  signature: string
+): RequestTransactionResponse => {
+  try {
+    // verify the signature
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+
+    const data = await processMessageData("initialize-stake", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const { walletAddress, solanaAssetId, amount, nonce } = data;
+
+    // validate signature status
+    const { isValid: isValidSignature, code: codeSignature } =
+      await validateAndUpdateSignatureStatus(nonce, signature);
+    if (!isValidSignature) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: codeSignature,
+      };
+    }
+
+    // prepare transaction parameters
+    const amountBN = new BN(amount * 1000000); // host share of the NFT is 0
+    const program = await StakeSystemManager.getInstance();
+    const user = new PublicKey(walletAddress); // owner of the NFT
+    const nftMintAddress = new PublicKey(solanaAssetId); // mint address of the NFT
+    const userNFTTokenAccount = await getUserNFTTokenAccount(
+      nftMintAddress,
+      user
+    );
+    const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("nfnode_entry"), nftMintAddress.toBuffer()],
+      program.programId
+    );
+    // Derive token storage authority PDA
+    const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_storage"), nftMintAddress.toBuffer()],
+      program.programId
+    );
+    // Obtain the user token account
+    const rewardTokenMint = await getRewardTokenMint();
+    const userTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(rewardTokenMint),
+      user
+    );
+
+    // Obtain the token storage account
+    const tokenStorageAccount = await getAssociatedTokenAddress(
+      new PublicKey(rewardTokenMint),
+      tokenStorageAuthority,
+      true // allowOwnerOffCurve = true para PDAs
+    );
+    const tokenMint = new PublicKey(rewardTokenMint);
+    // Add priority fee
+    const priorityFeeInSol = await getSolanaPriorityFee();
+    const microLamportsPerComputeUnit = Math.floor(
+      priorityFeeInSol * 1_000_000
+    );
+    const wayruFeeTransaction = await getWayruFeeTransaction();
+
+    const accounts = {
+      user: user,
+      nftMintAddress: nftMintAddress,
+      userNftTokenAccount: userNFTTokenAccount,
+      tokenMint: tokenMint,
+      nfnodeEntry: nfnodeEntryPDA,
+      tokenStorageAuthority,
+      tokenStorageAccount,
+      userTokenAccount,
+      tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    } as const;
+
+    // create a transaction
+    const ix = await program.methods
+      .initializeNfnode(amountBN)
+      .accounts(accounts)
+      .transaction();
+
+    // get the latest blockhash
+    const connection = getSolanaConnection();
+    let tx = new anchor.web3.Transaction();
+
+    // add instructions
+    const ixToSendWayruToFoundationWallet = await instructionToSendWayruToFoundationWallet(
+      user,
+      wayruFeeTransaction
+    );
+    if (!ixToSendWayruToFoundationWallet) {
+      throw new Error("Failed to create instruction to send wayru token to wayru foundation wallet");
+    }
+
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: microLamportsPerComputeUnit,
+      }),
+      ixToSendWayruToFoundationWallet,
+      ix
+    );
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = user; // set the fee payer
+
+    // serialize tx
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    // update tx status
+    await updateTransactionTrackerStatus(nonce, "request_authorized_by_admin");
+
+    return {
+      serializedTx: serializedTx.toString("base64"),
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE,
+    };
+  } catch (error) {
+    console.error(`Error requesting transaction initialize nfnode:`, error);
+    return {
+      serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+    };
+  }
+};
+
+/**
  * Request a transaction to claim reward
  * @param {string} signature - The signature of the reward claim message
  * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string

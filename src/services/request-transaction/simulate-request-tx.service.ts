@@ -1257,6 +1257,211 @@ export const simulateInitializeStakeTransaction = async ({
   );
 };
 
+export const simulateInitializeStakeTransactionV2 = async ({
+  walletAddress,
+  nftMintAddress,
+  amount,
+}: SimulateInitStakeParams): Promise<SimulationResultV2> => {
+  return simulationCache.getOrExecute(
+    {
+      type: "initialize_stake",
+      walletAddress,
+      nftMintAddress,
+    },
+    async () => {
+      try {
+        const program = await StakeSystemManager.getInstance();
+        const connection = getSolanaConnection();
+        const tokenMint = await getRewardTokenMint();
+        const priorityFeeInSol = await getSolanaPriorityFee();
+        const wayruFeeTransaction = await getWayruFeeTransaction();
+
+        // Initialize public keys
+        const user = new PublicKey(walletAddress);
+        const nftMint = new PublicKey(nftMintAddress);
+
+        // Get PDAs and accounts
+        const userNftTokenAccount = await getUserNFTTokenAccount(nftMint, user);
+        const [nfnodeEntryPDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from("nfnode_entry"), nftMint.toBuffer()],
+          program.programId
+        );
+        const [adminAccountPDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from("admin_account")],
+          program.programId
+        );
+        const [tokenStorageAuthority] = PublicKey.findProgramAddressSync(
+          [Buffer.from("token_storage"), nftMint.toBuffer()],
+          program.programId
+        );
+
+        // Get ATAs
+        const userTokenAccount = await getAssociatedTokenAddress(
+          new PublicKey(tokenMint),
+          user
+        );
+        const tokenStorageAccount = await getAssociatedTokenAddress(
+          new PublicKey(tokenMint),
+          tokenStorageAuthority,
+          true
+        );
+
+        // Check if the userTokenAccount exists
+        const userTokenAccountInfo = await connection.getAccountInfo(
+          userTokenAccount
+        );
+        const userTokenAccountRent = !userTokenAccountInfo
+          ? await connection.getMinimumBalanceForRentExemption(165)
+          : 0;
+
+        // Check if the tokenStorageAccount exists
+        const tokenStorageAccountInfo = await connection.getAccountInfo(
+          tokenStorageAccount
+        );
+        const tokenStorageAccountRent = !tokenStorageAccountInfo
+          ? await connection.getMinimumBalanceForRentExemption(165)
+          : 0;
+
+        // Add initialize nfnode instruction
+        const accounts = {
+          user,
+          nftMintAddress: nftMint,
+          userNftTokenAccount,
+          tokenMint: new PublicKey(tokenMint),
+          nfnodeEntry: nfnodeEntryPDA,
+          adminAccount: adminAccountPDA,
+          tokenStorageAuthority,
+          tokenStorageAccount,
+          userTokenAccount,
+          tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        } as const;
+
+        const initializeNfnodeIx = await program.methods
+          .initializeNfnode(new BN(amount * 1000000))
+          .accounts(accounts)
+          .instruction();
+
+        // Get latest blockhash
+        const latestBlockhash = await connection.getLatestBlockhash();
+
+        // Convert SOL to microLamports per compute unit
+        const microLamportsPerComputeUnit = Math.floor(
+          priorityFeeInSol * 1_000_000
+        );
+        const MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS =
+          await getMinimumRemainingSolanaBalance();
+
+        // create instruction to send wayru token to wayru foundation wallet
+        const ixToSendWayruToFoundationWallet = await instructionToSendWayruToFoundationWallet(
+          user,
+          wayruFeeTransaction
+        );
+        if (!ixToSendWayruToFoundationWallet) {
+          throw new Error("Failed to create instruction to send wayru token to wayru foundation wallet");
+        }
+
+        // Create TransactionMessage
+        const messageV0 = new TransactionMessage({
+          payerKey: user,
+          recentBlockhash: latestBlockhash.blockhash,
+          instructions: [
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: microLamportsPerComputeUnit,
+            }),
+            ixToSendWayruToFoundationWallet,
+            initializeNfnodeIx,
+          ],
+        }).compileToV0Message();
+
+        // Create VersionedTransaction
+        const transaction = new VersionedTransaction(messageV0);
+
+        // Get user's current balance
+        const { assets } = await getSolanaWalletBalance(walletAddress);
+        const userBalanceInSol = Number(assets.find((asset) => asset.name === "SOL")?.balance ?? 0);
+        const userBalanceInWayru = Number(assets.find((asset) => asset.name === "WAYRU")?.balance ?? 0);
+
+        // Calculate rent exempt for nfnode entry
+        const nfnodeEntryRent =
+          await connection.getMinimumBalanceForRentExemption(165);
+
+        // Get transaction fee
+        const transactionFee = await connection.getFeeForMessage(messageV0);
+        if (transactionFee.value === null) {
+          throw new Error("Failed to get fee for message");
+        }
+        const feeInLamports = transactionFee.value || 0;
+
+        // Sum all required lamports
+        const totalRequired =
+          nfnodeEntryRent +
+          userTokenAccountRent +
+          tokenStorageAccountRent +
+          feeInLamports +
+          MINIMUM_REMAINING_SOLANA_BALANCE_IN_LAMPORTS;
+        const totalRequiredInSol = totalRequired / LAMPORTS_PER_SOL;
+        const hasEnoughSolBalance = userBalanceInSol >= totalRequiredInSol;
+        const hasEnoughWayruBalance = userBalanceInWayru >= (wayruFeeTransaction + amount);
+
+        const details = {
+          networkFeeInSol: feeInLamports / LAMPORTS_PER_SOL,
+          wayruFeeTransaction: wayruFeeTransaction,
+          hasEnoughSolBalance: hasEnoughSolBalance,
+          hasEnoughWayruBalance: hasEnoughWayruBalance,
+          userBalanceInSol: userBalanceInSol,
+          userBalanceInWayru: userBalanceInWayru,
+          requiredBalanceInSol: totalRequiredInSol,
+          requiredBalanceWayru: (wayruFeeTransaction + amount),
+          txBase64: undefined,
+          discountCodeError: undefined,
+          breakdown: {
+            totalTransferAmountInSol: totalRequiredInSol,
+            totalTransferAmountInWayru: wayruFeeTransaction + amount,
+            treasuryPaymentInSol: 0,
+            treasuryPaymentInWayru: wayruFeeTransaction,
+            adminPaymentInSol: 0,
+          }
+        } as SimulationResultV2['details'];
+
+        // Simulate transaction
+        const simulation = await connection.simulateTransaction(transaction);
+
+        if (simulation.value.err) {
+          console.log("simulation logs:", simulation.value.logs);
+          return {
+            success: false,
+            feeInLamports: feeInLamports,
+            feeInSol: totalRequired / LAMPORTS_PER_SOL,
+            error: JSON.stringify(simulation.value.err),
+            details,
+            code: SIMULATE_REQUEST_TX_CODES.SIMULATION_FAILED,
+          } as SimulationResultV2;
+        }
+
+        return {
+          success: true,
+          feeInLamports: feeInLamports,
+          feeInSol: totalRequired / LAMPORTS_PER_SOL,
+          details,
+          code: SIMULATE_REQUEST_TX_CODES.SUCCESS,
+        } as SimulationResultV2;
+      } catch (error) {
+        console.error("Error in simulateInitializeNfnodeTransactionV2:", error);
+        return {
+          feeInLamports: 0,
+          feeInSol: 0,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+          code: SIMULATE_REQUEST_TX_CODES.UNKNOWN_ERROR,
+        };
+      }
+    }
+  );
+};
+
 export const simulateClaimRewardTransaction = async (
   walletAddress: string,
   amountToClaim: number,
