@@ -1231,7 +1231,6 @@ export const requestTransactionToUpdateHostV2 = async (
   }
 };
 
-
 /**
  * Request a transaction to withdraw tokens
  * @param signature - The signature of the withdraw tokens message
@@ -1325,6 +1324,112 @@ export const requestTransactionWithdrawTokens = async (
     };
   }
 };
+
+/**
+ * Request a transaction to withdraw tokens v2, include wayru network fee
+ * @param signature - The signature of the withdraw tokens message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionWithdrawTokensV2 = async (
+  signature: string
+): Promise<RequestTransactionResponse> => {
+  try {
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+    // decode the message
+    const data = await processMessageData("withdraw-tokens", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const { walletAddress, solanaAssetId, nonce } = data;
+
+    // validate signature status // validate signature status
+    const { isValid: isValidSignature, code: codeSignature } =
+      await validateAndUpdateSignatureStatus(nonce, signature);
+    if (!isValidSignature) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: codeSignature,
+      };
+    }
+
+    const connection = getSolanaConnection();
+    const program = await RewardSystemManager.getInstance();
+    const user = new PublicKey(walletAddress);
+    const nftMint = new PublicKey(solanaAssetId);
+    // get the user nft token account
+    const userNFTTokenAccount = await getAssociatedTokenAddress(
+      nftMint,
+      user,
+      false, // allowOwnerOffCurve
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const _userNFTTokenAccount = new PublicKey(userNFTTokenAccount);
+    const rewardTokenMint = await getRewardTokenMint();
+    const wayruFeeTransaction = await getWayruFeeTransaction();
+
+    const _signature = await program.methods
+      .withdrawTokens()
+      .accounts({
+        user: user,
+        tokenMint: new PublicKey(rewardTokenMint),
+        nftMintAddress: nftMint,
+        tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+        userNftTokenAccount: _userNFTTokenAccount,
+      })
+      .instruction();
+
+    const tx = new Transaction();
+    // add instruction to pay wayru network fee
+    const ixToSendWayruToFoundationWallet = await instructionToSendWayruToFoundationWallet(
+      user,
+      wayruFeeTransaction
+    );
+    if (!ixToSendWayruToFoundationWallet) {
+      throw new Error("Failed to create instruction to send wayru token to wayru foundation wallet");
+    }
+
+    // join instructions
+    tx.add(ixToSendWayruToFoundationWallet, _signature);
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = user;
+
+    // serialize tx
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    // update tx status
+    await updateTransactionTrackerStatus(nonce, "request_authorized_by_admin");
+
+    return {
+      serializedTx: serializedTx.toString("base64"),
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_SUCCESS_CODE,
+    };
+  } catch (error) {
+    console.error(`Error requesting transaction to withdraw tokens:`, error);
+    return {
+      serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_WITHDRAW_TOKENS_ERROR_CODE,
+    };
+  }
+};
+
 /**
  * Request a transaction to withdraw staked tokens
  * @param signature - The signature of the withdraw tokens message

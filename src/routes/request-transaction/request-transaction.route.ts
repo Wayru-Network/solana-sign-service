@@ -70,6 +70,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-withdraw-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawTokensV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-withdraw-staked-tokens',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.withdrawStakedTokens(ctx);
