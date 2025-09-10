@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionDepositTokens, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionDepositTokens, requestTransactionDepositTokensV2, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawStakedTokensV2, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -548,6 +548,52 @@ export class RequestTransactionController {
       }
     }
   }
+  static async withdrawStakedTokensV2(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionWithdrawStakedTokensV2(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors,
+          code: 'WT-001'
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error',
+          code: 'WT-002'
+        };
+      }
+    }
+  }
   static async depositTokens(ctx: CtxSignatureInside) {
     try {
       // validate request body
@@ -559,6 +605,52 @@ export class RequestTransactionController {
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
       const response = await requestTransactionDepositTokens(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors,
+          code: 'DT-001'
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error',
+          code: 'DT-002'
+        };
+      }
+    }
+  }
+  static async depositTokensV2(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionDepositTokensV2(signature);
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {

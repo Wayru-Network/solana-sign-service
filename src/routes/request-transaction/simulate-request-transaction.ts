@@ -67,8 +67,14 @@ const routes: Route[] = [
     handler: async (ctx: CtxSimulateUnstake) => {
       await SimulateRequestTxController.simulateUnstake(ctx);
     }
-  }
-  ,
+  },
+  {
+    method: 'post',
+    path: '/simulate-unstake-v2',
+    handler: async (ctx: CtxSimulateUnstake) => {
+      await SimulateRequestTxController.simulateUnstakeV2(ctx);
+    }
+  },
   {
     method: 'post',
     path: '/simulate-claim-reward',

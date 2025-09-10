@@ -84,9 +84,23 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-withdraw-staked-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawStakedTokensV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-deposit-tokens',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.depositTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-deposit-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.depositTokensV2(ctx);
     }
   },
   {
