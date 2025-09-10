@@ -91,6 +91,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-stake-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.stakeTokensV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-update-reward-contract',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.updateRewardContract(ctx);
