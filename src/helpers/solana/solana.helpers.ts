@@ -55,3 +55,9 @@ export const getStakeSystemProgramId = async () => {
     // remove all spaces
     return id.replace(/\s/g, '');
 }
+
+export const getWayruFeeTransaction = async () => {
+    const key = await getKeyByName('WAYRU_FEE_TRANSACTION');
+    const value = key?.value || ENV.DEFAULT_WAYRU_FEE_TRANSACTION;
+    return Number(value);
+}

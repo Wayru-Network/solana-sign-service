@@ -37,3 +37,28 @@ export interface SimulationResult {
     };
     code?: string;
 }
+
+export interface SimulationResultV2 {
+    success: boolean
+    error?: string
+    code: string
+    details?: {
+        networkFeeInSol: number
+        wayruFeeTransaction: number
+        hasEnoughSolBalance: boolean
+        hasEnoughWayruBalance: boolean
+        userBalanceInSol: number
+        userBalanceInWayru: number
+        requiredBalanceInSol: number
+        requiredBalanceWayru: number
+        txBase64?: string
+        discountCodeError?: string
+        breakdown?: {
+            totalTransferAmountInSol: number
+            totalTransferAmountInWayru: number
+            treasuryPaymentInSol: number
+            treasuryPaymentInWayru: number
+            adminPaymentInSol: number
+        }
+    }
+}
