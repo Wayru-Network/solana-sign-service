@@ -28,9 +28,23 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/simulate-initialize-nfnode-v2',
+    handler: async (ctx: CtxSimulateInitNfnode) => {
+      await SimulateRequestTxController.simulateInitializeNfnodeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/simulate-initialize-stake',
     handler: async (ctx: CtxSimulateInitStake) => {
       await SimulateRequestTxController.simulateInitializeStake(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/simulate-initialize-stake-v2',
+    handler: async (ctx: CtxSimulateInitStake) => {
+      await SimulateRequestTxController.simulateInitializeStakeV2(ctx);
     }
   },
   {
@@ -42,17 +56,37 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/simulate-stake-v2',
+    handler: async (ctx: CtxSimulateInitStake) => {
+      await SimulateRequestTxController.simulateStakeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/simulate-unstake',
     handler: async (ctx: CtxSimulateUnstake) => {
       await SimulateRequestTxController.simulateUnstake(ctx);
     }
-  }
-  ,
+  },
+  {
+    method: 'post',
+    path: '/simulate-unstake-v2',
+    handler: async (ctx: CtxSimulateUnstake) => {
+      await SimulateRequestTxController.simulateUnstakeV2(ctx);
+    }
+  },
   {
     method: 'post',
     path: '/simulate-claim-reward',
     handler: async (ctx: CtxSimulateClaimReward) => {
       await SimulateRequestTxController.simulateClaimReward(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/simulate-claim-reward-v2',
+    handler: async (ctx: CtxSimulateClaimReward) => {
+      await SimulateRequestTxController.simulateClaimRewardV2(ctx);
     }
   }
 ];

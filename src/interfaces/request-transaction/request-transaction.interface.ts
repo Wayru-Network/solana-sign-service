@@ -81,6 +81,8 @@ export interface UpdateHostMessage {
     paymentToAddHostToNFnode: number;
     solanaWalletAddressAdmin: string;
     solanaTreasuryWalletAddress: string;
+    solanaWayruFeeTransactionAddress: string;
+    wayruFeeTransaction: number;
     hostShare: number;
 }
 

@@ -20,6 +20,12 @@ export async function errorHandler(ctx: Context, next: Next) {
 
 // Optional: Authentication validation middleware
 export async function authValidator(ctx: Context, next: Next) {
+
+  if (ENV.NOT_VALIDATE_AUTH) {
+    await next();
+    return;
+  }
+
   const token = ctx.headers.authorization;
 
   if (!token) {
@@ -30,7 +36,7 @@ export async function authValidator(ctx: Context, next: Next) {
     };
     return;
   }
- 
+
   try {
     // replace bearer from token
     const jwtToken = token.replace('Bearer ', '');
@@ -63,7 +69,7 @@ export async function authValidator(ctx: Context, next: Next) {
   } catch (error) {
     console.log('error', error);
     ctx.response.status = 401;
-    ctx.response.body = { 
+    ctx.response.body = {
       error: true,
       message: 'Unauthorized'
     };
