@@ -14,6 +14,13 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-claim-rewards-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.claimRewardsV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-initialize-nfnode',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.initializeNfnode(ctx);
@@ -28,9 +35,23 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-initialize-stake-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.initializeStakeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-add-host-to-nfnode',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.addHostToNfnode(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-add-host-to-nfnode-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.addHostToNfnodeV2(ctx);
     }
   },
   {
@@ -49,9 +70,23 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-withdraw-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawTokensV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-withdraw-staked-tokens',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.withdrawStakedTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-withdraw-staked-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.withdrawStakedTokensV2(ctx);
     }
   },
   {
@@ -63,9 +98,23 @@ const routes: Route[] = [
   },
   {
     method: 'post',
+    path: '/to-deposit-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.depositTokensV2(ctx);
+    }
+  },
+  {
+    method: 'post',
     path: '/to-stake-tokens',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.stakeTokens(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/to-stake-tokens-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.stakeTokensV2(ctx);
     }
   },
   {
@@ -74,7 +123,14 @@ const routes: Route[] = [
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.updateRewardContract(ctx);
     }
-  }
+  },
+  {
+    method: 'post',
+    path: '/to-initialize-nfnode-v2',
+    handler: async (ctx: CtxSignatureInside) => {
+      await RequestTransactionController.initializeNfnodeV2(ctx);
+    }
+  },
 ];
 
 // Register all routes automatically
