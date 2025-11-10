@@ -154,7 +154,6 @@ export const validateAndUpdateSignatureStatus = async (
 };
 
 export const verifyTxTrackerToClaimDepinStakerRewards = async ({ signature, nonce, minerId, amountToClaim }: VerifySignatureStatusToClaim) => {
-    console.log('verifyTxTrackerToClaimDepinStakerRewards', signature, nonce, minerId, amountToClaim);
     // validations for signature and rewards id:
     // 1: signature is equal to the signature in the database
     // 2: document status is equal to claiming
@@ -175,37 +174,31 @@ export const verifyTxTrackerToClaimDepinStakerRewards = async ({ signature, nonc
     );
     const document = signatureUsed?.rows?.length > 0 ? signatureUsed.rows[0] : null
     if (!document) {
-        console.log('document not found');
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_NOT_FOUND_ERROR_CODE
         }
     }
-    console.log('document found');
 
     // into tx context has to be the amount to claim, the name is amountToClaim, and has to be equal to the amount in the document
     const amountToClaimDocument = document?.tx_context?.amountToClaim as number;
     const formattedAmountToClaimDocument = Number(amountToClaimDocument).toFixed(2);
     const formattedAmountToClaim = Number(amountToClaim).toFixed(2);
     if (!amountToClaimDocument || !amountToClaim || Number(formattedAmountToClaimDocument) !== Number(formattedAmountToClaim)) {
-        console.log('amounts do not match');
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_AMOUNT_NOT_MATCH_ERROR_CODE
         }
     }
-    console.log('amounts match');
 
     // validate if the document is older than 30 seconds
     const isOlderThan30Seconds = moment(document?.created_at).isBefore(moment().subtract(REQUEST_TRANSACTION_EXPIRATION_TIME, 'seconds'));
     if (isOlderThan30Seconds) {
-        console.log('document is older than 30 seconds');
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SIGNATURE_EXPIRED_ERROR_CODE
         }
     }
-    console.log('document is not older than 30 seconds');
 
     // validations for minerId:
     //1: find depin_stakes_rewards that matches the minerId and has the status claiming
@@ -219,7 +212,6 @@ export const verifyTxTrackerToClaimDepinStakerRewards = async ({ signature, nonc
         [minerId, 'claiming']
     );
     if (depinStakeRewards?.rows?.length === 0) {
-        console.log('depin stake rewards not found');
         return {
             isValidStatus: false,
             code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_MINER_ID_NOT_MATCH_ERROR_CODE

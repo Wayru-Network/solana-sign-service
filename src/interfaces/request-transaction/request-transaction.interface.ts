@@ -30,6 +30,12 @@ export interface RequestTransactionUpdateHost {
 
 /** Responses types */
 export type RequestTransactionResponse = Promise<{ serializedTx: string | null, error: boolean, code: string }>
+export type RequestTransactionWithInitResponse = Promise<{
+    serializedTx: string | null,
+    serializedInitTx: string | null,
+    error: boolean,
+    code: string
+}>
 
 
 

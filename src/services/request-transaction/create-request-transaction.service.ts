@@ -1,6 +1,5 @@
 import {
     InitializeNfnodeMessage,
-    NFNodeType,
     NFNodeTypeEnum,
 } from "@interfaces/request-transaction/request-transaction.interface";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
@@ -15,7 +14,6 @@ import {
     PublicKey,
     TransactionMessage,
     VersionedTransaction,
-    Transaction,
 } from "@solana/web3.js";
 import {
     ASSOCIATED_TOKEN_PROGRAM_ID,

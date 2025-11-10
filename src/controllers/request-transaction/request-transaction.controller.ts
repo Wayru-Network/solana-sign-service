@@ -105,19 +105,21 @@ export class RequestTransactionController {
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
       const response = await requestTransactionToClaimDepinStakerRewards(signature);
-      if (response.error || !response.serializedTx) {
+      if (response.error || !response.serializedTx || !response.serializedInitTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: null
+          serializedTx: null,
+          serializedInitTx: null
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
+          serializedInitTx: response.serializedInitTx
         };
       }
 

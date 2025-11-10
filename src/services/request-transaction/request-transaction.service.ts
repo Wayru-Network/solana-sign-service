@@ -1,13 +1,13 @@
 import {
   NFNodeTypeEnum,
   RequestTransactionResponse,
+  RequestTransactionWithInitResponse,
 } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import {
   convertToTokenAmount,
   getUserNFTTokenAccount,
-  getWayruFoundationWalletAddress,
 } from "../solana/solana.service";
 import {
   getKeyPairFromUnit8Array,
@@ -914,19 +914,20 @@ export const requestTransactionToClaimRewardV2 = async (
 
 /**
  * Request a transaction to claim reward v2, pay wayru network fee is included
+ * Returns 2 transactions: one to initialize the NFT (nfnode) and one to claim rewards
  * @param {string} signature - The signature of the reward claim message
- * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ * @returns {Promise<{ serializedTx: string | null, serializedInitTx: string | null, error: boolean, code: string }>} - serializedTx: claim rewards tx, serializedInitTx: initialize nfnode tx
  */
 export const requestTransactionToClaimDepinStakerRewards = async (
   signature: string
-): RequestTransactionResponse => {
+): RequestTransactionWithInitResponse => {
   let nonceFDB: number | undefined;
   try {
-    console.log('requestTransactionToClaimDepinStakerRewards', signature);
     const { isValid, message } = await verifyTransactionSignature(signature);
     if (!isValid || !message) {
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE,
       };
@@ -935,6 +936,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     if (!data) {
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE,
       };
@@ -965,13 +967,39 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       );
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: code,
       };
     }
     nonceFDB = nonce;
 
-    // prepare transaction parameters
+    // Get nfnode initialization data from message or use defaults
+    // Note: These fields should be added to the ClaimRewardsMessage interface if not present
+    const nfnodeType = (data as any).nfnodeType || { don: {} }; // Default to 'don' type
+    const hostAddress = (data as any).hostAddress || "8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD";
+    const manufacturerAddress = (data as any).manufacturerAddress || "FCap4kWAPMMTvAqUgEX3oFmMmSzg7g3ytxknYD21hpzm";
+
+    // Create transaction to initialize NFT (nfnode)
+    const { error: initTxError, serializedTransaction: serializedInitTx } = await createTransactionToInitializeNfnode({
+      walletAddress: walletAddress,
+      nftMintAddress: solanaAssetId,
+      nfnodeType: nfnodeType,
+      hostAddress: hostAddress,
+      manufacturerAddress: manufacturerAddress,
+      forSimulation: false // This is for real transaction
+    });
+
+    if (initTxError || !serializedInitTx) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+      };
+    }
+
+    // prepare transaction parameters for claim rewards
     const rewardTokenMint = await getRewardTokenMint();
     const program = await RewardSystemManager.getInstance();
     const adminKeypair = getKeyPairFromUnit8Array(
@@ -1001,11 +1029,11 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     if (!accounts) {
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
       };
     }
-    let ix: anchor.web3.TransactionInstruction | null = null;
 
     // create instruction to send wayru token to wayru foundation wallet
     const ixToSendWayruToFoundationWallet =
@@ -1016,23 +1044,18 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     if (!ixToSendWayruToFoundationWallet) {
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
       };
     }
 
-    // create a transaction
-    if (claimerType === "owner") {
-      ix = await program.methods
-        .ownerClaimRewards(amountToClaim, bnNonce)
-        .accounts(accounts as unknown as any)
-        .instruction();
-    } else {
-      ix = await program.methods
-        .othersClaimRewards(amountToClaim, bnNonce)
-        .accounts(accounts)
-        .instruction();
-    }
+
+    const ix = await program.methods
+      .ownerClaimRewards(amountToClaim, bnNonce)
+      .accounts(accounts as unknown as any)
+      .instruction();
+
 
     // Modify the transaction creation
     const connection = getSolanaConnection();
@@ -1064,13 +1087,15 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     if (!updatedTransactionTracker) {
       return {
         serializedTx: null,
+        serializedInitTx: null,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_UPDATE_CLAIM_REWARD_HISTORY_ERROR_CODE,
       };
     }
-    // return the transaction
+    // return both transactions
     return {
       serializedTx: txBase64,
+      serializedInitTx: serializedInitTx,
       error: false,
       code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
     };
@@ -1084,6 +1109,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     }
     return {
       serializedTx: null,
+      serializedInitTx: null,
       error: true,
       code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
     };
