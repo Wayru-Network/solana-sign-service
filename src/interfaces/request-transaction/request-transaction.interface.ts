@@ -43,7 +43,8 @@ export type MessageType =
     'claim-w-credits' |
     'deposit-tokens' |
     'stake-tokens' |
-    'update-reward-contract'
+    'update-reward-contract' |
+    'claim-depin-staker-rewards'
 
 export type NFNodeTypeEnum = 'don' | 'byod' | 'wayruHotspot'
 export type NFNodeType = 'don' | 'byod' | 'wayru'
@@ -53,6 +54,7 @@ export interface ClaimRewardsMessage {
     totalAmount: number;
     minerId: number;
     type: ClaimerType
+    isDepinStakerRewards?: boolean;
     solanaAssetId: string;
     nonce: number;
 }
@@ -121,6 +123,16 @@ interface UpdateRewardContractMessage {
     status: 'invalid_nfnode' | 'only_init_nfnode' | 'claim_and_init_nfnode'
 }
 
+
+interface ClaimDepinStakerRewardsMessage {
+    walletAddress: string;
+    totalAmount: number;
+    minerId: number;
+    type: ClaimerType
+    solanaAssetId: string;
+    nonce: number;
+}
+
 // Mapping between message types and their payloads
 export type PayloadProcessMessageByType = {
     'claim-rewards': ClaimRewardsMessage;
@@ -132,5 +144,6 @@ export type PayloadProcessMessageByType = {
     'deposit-tokens': DepositTokensMessage;
     'stake-tokens': StakeTokensMessage;
     'update-reward-contract': UpdateRewardContractMessage;
+    'claim-depin-staker-rewards': ClaimDepinStakerRewardsMessage;
 }
 

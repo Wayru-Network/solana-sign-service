@@ -35,7 +35,7 @@ import {
   processMessageData,
 } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
-import { validateAndUpdateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
+import { validateAndUpdateSignatureStatus, verifyTxTrackerToClaimDepinStakerRewards } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
 import {
   updateTransactionTrackerStatus,
@@ -772,6 +772,185 @@ export const requestTransactionToClaimRewardV2 = async (
     // first verify the signature status
     const { isValidStatus, code } =
       await verifyTransactionTrackerToClaimRewards({
+        signature,
+        minerId,
+        claimerType,
+        nonce,
+        amountToClaim: totalAmount,
+      });
+    if (!isValidStatus) {
+      // update the status of the transaction
+      await updateTransactionTrackerStatus(
+        nonce,
+        "request_unauthorized_by_admin"
+      );
+      return {
+        serializedTx: null,
+        error: true,
+        code: code,
+      };
+    }
+    nonceFDB = nonce;
+
+    // prepare transaction parameters
+    const rewardTokenMint = await getRewardTokenMint();
+    const program = await RewardSystemManager.getInstance();
+    const adminKeypair = getKeyPairFromUnit8Array(
+      Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string))
+    );
+    const user = new PublicKey(walletAddress);
+    const mint = new PublicKey(rewardTokenMint);
+    const nftMint = new PublicKey(solanaAssetId);
+    const amountToClaim = new BN(convertToTokenAmount(totalAmount));
+    const bnNonce = new BN(nonce);
+    // Add priority fee
+    const priorityFeeInSol = await getSolanaPriorityFee();
+    const wayruFeeTransaction = await getWayruFeeTransaction();
+    const microLamportsPerComputeUnit = Math.floor(
+      priorityFeeInSol * 1_000_000
+    );
+
+    // prepare params to claim reward
+    const accounts = await prepareAccountsToClaimReward({
+      program,
+      mint,
+      userWallet: user,
+      nftMint,
+      claimerType,
+      adminKeypair,
+    });
+    if (!accounts) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
+      };
+    }
+    let ix: anchor.web3.TransactionInstruction | null = null;
+
+    // create instruction to send wayru token to wayru foundation wallet
+    const ixToSendWayruToFoundationWallet =
+      await instructionToSendWayruToFoundationWallet(
+        user,
+        wayruFeeTransaction
+      );
+    if (!ixToSendWayruToFoundationWallet) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
+      };
+    }
+
+    // create a transaction
+    if (claimerType === "owner") {
+      ix = await program.methods
+        .ownerClaimRewards(amountToClaim, bnNonce)
+        .accounts(accounts as unknown as any)
+        .instruction();
+    } else {
+      ix = await program.methods
+        .othersClaimRewards(amountToClaim, bnNonce)
+        .accounts(accounts)
+        .instruction();
+    }
+
+    // Modify the transaction creation
+    const connection = getSolanaConnection();
+    let tx = new anchor.web3.Transaction();
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: microLamportsPerComputeUnit,
+      }),
+      ixToSendWayruToFoundationWallet,
+      ix
+    );
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = user;
+    tx.partialSign(adminKeypair);
+
+    // serialize tx
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    const txBase64 = serializedTx.toString("base64");
+
+    // update the status of claim reward history because the admin has authorized the claim
+    const updatedTransactionTracker = await updateTransactionTrackerStatus(
+      nonce,
+      "request_authorized_by_admin"
+    );
+    if (!updatedTransactionTracker) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_UPDATE_CLAIM_REWARD_HISTORY_ERROR_CODE,
+      };
+    }
+    // return the transaction
+    return {
+      serializedTx: txBase64,
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
+    };
+  } catch (error) {
+    console.error(`Error requesting transaction to claim reward:`, error);
+    if (nonceFDB !== undefined) {
+      await updateTransactionTrackerStatus(
+        nonceFDB,
+        "request_unauthorized_by_admin"
+      );
+    }
+    return {
+      serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
+    };
+  }
+};
+
+
+/**
+ * Request a transaction to claim reward v2, pay wayru network fee is included
+ * @param {string} signature - The signature of the reward claim message
+ * @returns {Promise<{ serializedTx: string | null, error: boolean, code: string }>} - serializedTx: string | null, error: boolean, code: string
+ */
+export const requestTransactionToClaimDepinStakerRewards = async (
+  signature: string
+): RequestTransactionResponse => {
+  let nonceFDB: number | undefined;
+  try {
+    console.log('requestTransactionToClaimDepinStakerRewards', signature);
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+    const data = await processMessageData("claim-rewards", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const {
+      walletAddress,
+      totalAmount,
+      minerId,
+      type: claimerType,
+      solanaAssetId,
+      nonce,
+    } = data;
+
+    // first verify the signature status
+    const { isValidStatus, code } =
+      await verifyTxTrackerToClaimDepinStakerRewards({
         signature,
         minerId,
         claimerType,

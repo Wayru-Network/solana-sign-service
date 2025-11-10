@@ -1,6 +1,6 @@
 import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionDepositTokens, requestTransactionDepositTokensV2, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawStakedTokensV2, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
+import { requestTransactionDepositTokens, requestTransactionDepositTokensV2, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimDepinStakerRewards, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawStakedTokensV2, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
 
 export class RequestTransactionController {
@@ -60,6 +60,51 @@ export class RequestTransactionController {
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
       const response = await requestTransactionToClaimRewardV2(signature);
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: null
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx
+        };
+      }
+
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: 'validation error',
+          errors: err.errors
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: 'internal server error'
+        };
+      }
+    }
+  }
+  static async claimDepinStakerRewards(ctx: CtxSignatureInside) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      // prepare transaction
+      const response = await requestTransactionToClaimDepinStakerRewards(signature);
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
