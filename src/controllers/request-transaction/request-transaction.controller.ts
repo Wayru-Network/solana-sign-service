@@ -106,7 +106,7 @@ export class RequestTransactionController {
       const includeInitTx = ctx.request.body?.includeInitTx as boolean;
       // prepare transaction
       const response = await requestTransactionToClaimDepinStakerRewards(signature, includeInitTx);
-      if (response.error || !response.serializedTx || !response.serializedInitTx) {
+      if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
