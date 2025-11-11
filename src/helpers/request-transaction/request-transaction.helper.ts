@@ -5,7 +5,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
-import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema } from "@validations/request-transaction/request-transaction.validation";
+import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema, claimDepinStakerRewardsSchema } from "@validations/request-transaction/request-transaction.validation";
 import nacl from 'tweetnacl';
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
@@ -130,37 +130,37 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
 export const verifyTransactionSignature = async (serializedTransaction: string): Promise<{ isValid: boolean; message?: string }> => {
     try {
         const transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
-        
+
         // Verify the transaction signature
         const messageBytes = transaction.compileMessage().serialize();
         const dbAdminPubKey = new PublicKey(ENV.DB_ADMIN_PUBLIC_KEY);
-        
+
         // Find the signature corresponding to the admin key
         const adminSignatureIndex = transaction.signatures.findIndex(
             sig => sig.publicKey.toString() === ENV.DB_ADMIN_PUBLIC_KEY
         );
-        
+
         if (adminSignatureIndex === -1 || !transaction.signatures[adminSignatureIndex].signature) {
             return { isValid: false };
         }
-        
+
         // Verify the signature using the tweetnacl library
         const signatureValid = nacl.sign.detached.verify(
-            messageBytes, 
-            transaction.signatures[adminSignatureIndex].signature!, 
+            messageBytes as Uint8Array,
+            transaction.signatures[adminSignatureIndex].signature!.slice() as Uint8Array,
             dbAdminPubKey.toBytes()
         );
-        
+
         if (!signatureValid) {
             return { isValid: false };
         }
-        
+
         // If the signature is valid, extract the message
         const message = transaction.instructions
             .slice(1) // Ignore the first instruction (transfer)
             .map(inst => inst.data.toString())
             .join('');
-            
+
         return { isValid: true, message };
     } catch (error) {
         console.error('Error verifying the transaction:', error);
@@ -205,6 +205,9 @@ export const processMessageData = async <T extends MessageType>(type: T, message
             case 'update-reward-contract':
                 await updateRewardContractSchema.validate(data);
                 return data;
+            case 'claim-depin-staker-rewards':
+                await claimDepinStakerRewardsSchema.validate(data);
+                return data;
             default:
                 return null;
         }
@@ -229,16 +232,16 @@ export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: b
         if (typeof jsonString !== 'string') {
             return { data: null, error: true };
         }
-        
+
         // Validate basic JSON format (start and end correctly)
         const trimmed = jsonString.trim();
         if (!(
-            (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+            (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
             (trimmed.startsWith('[') && trimmed.endsWith(']'))
         )) {
             return { data: null, error: true };
         }
-        
+
         // Parse the JSON
         const parsed = JSON.parse(jsonString);
         return { data: parsed as T, error: false };

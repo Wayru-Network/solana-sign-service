@@ -1,6 +1,6 @@
 import Router from 'koa-router';
 import { Route } from '@/interfaces/api/api';
-import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
+import { CtxClaimDepinStakerRewards, CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { RequestTransactionController } from '@/controllers/request-transaction/request-transaction.controller';
 const router = new Router();
 
@@ -10,13 +10,23 @@ const routes: Route[] = [
     path: '/to-claim-rewards',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.claimRewards(ctx);
-    }
+    },
   },
   {
     method: 'post',
     path: '/to-claim-rewards-v2',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.claimRewardsV2(ctx);
+    },
+  },
+  {
+    method: 'post',
+    path: '/to-claim-depin-staker-rewards',
+    handler: async (ctx: CtxClaimDepinStakerRewards) => {
+      await RequestTransactionController.claimDepinStakerRewards(ctx);
+    },
+    config: {
+      auth: false // Set to false to make this route public (no authentication required)
     }
   },
   {
@@ -137,5 +147,8 @@ const routes: Route[] = [
 routes.forEach(route => {
   router[route.method](route.path, route.handler);
 });
+
+// Export routes array for configuration-based registration
+export { routes };
 
 export default router;

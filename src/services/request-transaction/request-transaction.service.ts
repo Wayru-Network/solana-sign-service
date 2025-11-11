@@ -1,13 +1,13 @@
 import {
   NFNodeTypeEnum,
   RequestTransactionResponse,
+  RequestTransactionWithInitResponse,
 } from "@interfaces/request-transaction/request-transaction.interface";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import {
   convertToTokenAmount,
   getUserNFTTokenAccount,
-  getWayruFoundationWalletAddress,
 } from "../solana/solana.service";
 import {
   getKeyPairFromUnit8Array,
@@ -35,7 +35,7 @@ import {
   processMessageData,
 } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
-import { validateAndUpdateSignatureStatus } from "../transaction-tracker/transaction-tracker.service";
+import { validateAndUpdateSignatureStatus, verifyTxTrackerToClaimDepinStakerRewards } from "../transaction-tracker/transaction-tracker.service";
 import { ENV } from "@config/env/env";
 import {
   updateTransactionTrackerStatus,
@@ -905,6 +905,215 @@ export const requestTransactionToClaimRewardV2 = async (
     }
     return {
       serializedTx: null,
+      error: true,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
+    };
+  }
+};
+
+
+/**
+ * Request a transaction to claim reward v2, pay wayru network fee is included
+ * Returns 2 transactions: one to initialize the NFT (nfnode) and one to claim rewards
+ * @param {string} signature - The signature of the reward claim message
+ * @returns {Promise<{ serializedTx: string | null, serializedInitTx: string | null, error: boolean, code: string }>} - serializedTx: claim rewards tx, serializedInitTx: initialize nfnode tx
+ */
+export const requestTransactionToClaimDepinStakerRewards = async (
+  signature: string,
+  includeInitTx: boolean
+): RequestTransactionWithInitResponse => {
+  let nonceFDB: number | undefined;
+  try {
+    const { isValid, message } = await verifyTransactionSignature(signature);
+    if (!isValid || !message) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE,
+      };
+    }
+    const data = await processMessageData("claim-rewards", message);
+    if (!data) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE,
+      };
+    }
+    const {
+      walletAddress,
+      totalAmount,
+      minerId,
+      type: claimerType,
+      solanaAssetId,
+      nonce,
+    } = data;
+
+    // first verify the signature status
+    const { isValidStatus, code } =
+      await verifyTxTrackerToClaimDepinStakerRewards({
+        signature,
+        minerId,
+        claimerType,
+        nonce,
+        amountToClaim: totalAmount,
+      });
+    if (!isValidStatus) {
+      // update the status of the transaction
+      await updateTransactionTrackerStatus(
+        nonce,
+        "request_unauthorized_by_admin"
+      );
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: code,
+      };
+    }
+    nonceFDB = nonce;
+
+    // Get nfnode initialization data from message or use defaults
+    // Note: These fields should be added to the ClaimRewardsMessage interface if not present
+    const nfnodeType = (data as any).nfnodeType || { don: {} }; // Default to 'don' type
+    const hostAddress = (data as any).hostAddress || "8QMK1JHzjydq7qHgTo1RwK3ateLm4zVQF7V7BkriNkeD";
+    const manufacturerAddress = (data as any).manufacturerAddress || "FCap4kWAPMMTvAqUgEX3oFmMmSzg7g3ytxknYD21hpzm";
+
+    // Create transaction to initialize NFT (nfnode)
+    let serializedInitTx = null;
+    if (includeInitTx) {
+      const { error: initTxError, serializedTransaction } = await createTransactionToInitializeNfnode({
+        walletAddress: walletAddress,
+        nftMintAddress: solanaAssetId,
+        nfnodeType: nfnodeType,
+        hostAddress: hostAddress,
+        manufacturerAddress: manufacturerAddress,
+        forSimulation: false // This is for real transaction
+      });
+      serializedInitTx = serializedTransaction
+      if (initTxError || !serializedInitTx) {
+        return {
+          serializedTx: null,
+          serializedInitTx: null,
+          error: true,
+          code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+        };
+      }
+    }
+
+    // prepare transaction parameters for claim rewards
+    const rewardTokenMint = await getRewardTokenMint();
+    const program = await RewardSystemManager.getInstance();
+    const adminKeypair = getKeyPairFromUnit8Array(
+      Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string))
+    );
+    const user = new PublicKey(walletAddress);
+    const mint = new PublicKey(rewardTokenMint);
+    const nftMint = new PublicKey(solanaAssetId);
+    const amountToClaim = new BN(convertToTokenAmount(totalAmount));
+    const bnNonce = new BN(nonce);
+    // Add priority fee
+    const priorityFeeInSol = await getSolanaPriorityFee();
+    const wayruFeeTransaction = await getWayruFeeTransaction();
+    const microLamportsPerComputeUnit = Math.floor(
+      priorityFeeInSol * 1_000_000
+    );
+
+    // prepare params to claim reward
+    const accounts = await prepareAccountsToClaimReward({
+      program,
+      mint,
+      userWallet: user,
+      nftMint,
+      claimerType,
+      adminKeypair,
+    });
+    if (!accounts) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
+      };
+    }
+
+    // create instruction to send wayru token to wayru foundation wallet
+    const ixToSendWayruToFoundationWallet =
+      await instructionToSendWayruToFoundationWallet(
+        user,
+        wayruFeeTransaction
+      );
+    if (!ixToSendWayruToFoundationWallet) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
+      };
+    }
+
+
+    const ix = await program.methods
+      .ownerClaimRewards(amountToClaim, bnNonce)
+      .accounts(accounts as unknown as any)
+      .instruction();
+
+
+    // Modify the transaction creation
+    const connection = getSolanaConnection();
+    let tx = new anchor.web3.Transaction();
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: microLamportsPerComputeUnit,
+      }),
+      ixToSendWayruToFoundationWallet,
+      ix
+    );
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = user;
+    tx.partialSign(adminKeypair);
+
+    // serialize tx
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    const txBase64 = serializedTx.toString("base64");
+
+    // update the status of claim reward history because the admin has authorized the claim
+    const updatedTransactionTracker = await updateTransactionTrackerStatus(
+      nonce,
+      "request_authorized_by_admin"
+    );
+    if (!updatedTransactionTracker) {
+      return {
+        serializedTx: null,
+        serializedInitTx: null,
+        error: true,
+        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_UPDATE_CLAIM_REWARD_HISTORY_ERROR_CODE,
+      };
+    }
+    // return both transactions
+    return {
+      serializedTx: txBase64,
+      serializedInitTx: serializedInitTx,
+      error: false,
+      code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
+    };
+  } catch (error) {
+    console.error(`Error requesting transaction to claim reward:`, error);
+    if (nonceFDB !== undefined) {
+      await updateTransactionTrackerStatus(
+        nonceFDB,
+        "request_unauthorized_by_admin"
+      );
+    }
+    return {
+      serializedTx: null,
+      serializedInitTx: null,
       error: true,
       code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
     };
