@@ -1,4 +1,4 @@
-import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
+import { CtxClaimDepinStakerRewards, CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
 import { requestTransactionDepositTokens, requestTransactionDepositTokensV2, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimDepinStakerRewards, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawStakedTokensV2, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
 import { ValidationError } from 'yup';
@@ -94,7 +94,7 @@ export class RequestTransactionController {
       }
     }
   }
-  static async claimDepinStakerRewards(ctx: CtxSignatureInside) {
+  static async claimDepinStakerRewards(ctx: CtxClaimDepinStakerRewards) {
     try {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
@@ -103,8 +103,9 @@ export class RequestTransactionController {
       });
 
       const signature = ctx.request.body?.signature as string;
+      const includeInitTx = ctx.request.body?.includeInitTx as boolean;
       // prepare transaction
-      const response = await requestTransactionToClaimDepinStakerRewards(signature);
+      const response = await requestTransactionToClaimDepinStakerRewards(signature, includeInitTx);
       if (response.error || !response.serializedTx || !response.serializedInitTx) {
         ctx.status = 400;
         ctx.body = {

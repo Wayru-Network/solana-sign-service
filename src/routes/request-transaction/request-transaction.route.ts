@@ -1,6 +1,6 @@
 import Router from 'koa-router';
 import { Route } from '@/interfaces/api/api';
-import { CtxSignatureInside } from '@/interfaces/request-transaction/api';
+import { CtxClaimDepinStakerRewards, CtxSignatureInside } from '@/interfaces/request-transaction/api';
 import { RequestTransactionController } from '@/controllers/request-transaction/request-transaction.controller';
 const router = new Router();
 
@@ -22,7 +22,7 @@ const routes: Route[] = [
   {
     method: 'post',
     path: '/to-claim-depin-staker-rewards',
-    handler: async (ctx: CtxSignatureInside) => {
+    handler: async (ctx: CtxClaimDepinStakerRewards) => {
       await RequestTransactionController.claimDepinStakerRewards(ctx);
     },
     config: {

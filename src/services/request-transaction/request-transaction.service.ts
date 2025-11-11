@@ -919,7 +919,8 @@ export const requestTransactionToClaimRewardV2 = async (
  * @returns {Promise<{ serializedTx: string | null, serializedInitTx: string | null, error: boolean, code: string }>} - serializedTx: claim rewards tx, serializedInitTx: initialize nfnode tx
  */
 export const requestTransactionToClaimDepinStakerRewards = async (
-  signature: string
+  signature: string,
+  includeInitTx: boolean
 ): RequestTransactionWithInitResponse => {
   let nonceFDB: number | undefined;
   try {
@@ -981,22 +982,25 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     const manufacturerAddress = (data as any).manufacturerAddress || "FCap4kWAPMMTvAqUgEX3oFmMmSzg7g3ytxknYD21hpzm";
 
     // Create transaction to initialize NFT (nfnode)
-    const { error: initTxError, serializedTransaction: serializedInitTx } = await createTransactionToInitializeNfnode({
-      walletAddress: walletAddress,
-      nftMintAddress: solanaAssetId,
-      nfnodeType: nfnodeType,
-      hostAddress: hostAddress,
-      manufacturerAddress: manufacturerAddress,
-      forSimulation: false // This is for real transaction
-    });
-
-    if (initTxError || !serializedInitTx) {
-      return {
-        serializedTx: null,
-        serializedInitTx: null,
-        error: true,
-        code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
-      };
+    let serializedInitTx = null;
+    if (includeInitTx) {
+      const { error: initTxError, serializedTransaction } = await createTransactionToInitializeNfnode({
+        walletAddress: walletAddress,
+        nftMintAddress: solanaAssetId,
+        nfnodeType: nfnodeType,
+        hostAddress: hostAddress,
+        manufacturerAddress: manufacturerAddress,
+        forSimulation: false // This is for real transaction
+      });
+      serializedInitTx = serializedTransaction
+      if (initTxError || !serializedInitTx) {
+        return {
+          serializedTx: null,
+          serializedInitTx: null,
+          error: true,
+          code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
+        };
+      }
     }
 
     // prepare transaction parameters for claim rewards
