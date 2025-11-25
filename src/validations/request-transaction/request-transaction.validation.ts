@@ -113,3 +113,12 @@ export const updateRewardContractSchema = yup.object().shape({
   status: yup.string().oneOf(['invalid_nfnode', 'only_init_nfnode', 'claim_and_init_nfnode'], 'Invalid status').required('Status is required')
 });
 
+
+export const claimDepinStakerRewardsSchema = yup.object().shape({
+  walletAddress: yup.string().required('Wallet address is required'),
+  totalAmount: yup.number().required('Total amount is required').positive('Amount must be positive'),
+  minerId: yup.number().required('Miner ID is required').positive('Miner ID must be positive'),
+  type: yup.string().oneOf(['owner', 'other'], 'Invalid claimer type').required('Type is required'),
+  solanaAssetId: yup.string().required('Solana asset ID is required'),
+  nonce: yup.number().required('Nonce is required')
+});
