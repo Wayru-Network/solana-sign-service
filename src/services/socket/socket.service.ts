@@ -80,7 +80,6 @@ export const initializeSocketIO = (httpServer: HTTPServer): SocketIOServer => {
 
     // Handle connections on the namespace
     solanaSignNamespace.on('connection', (socket: any) => {
-        console.log(`✅ Socket connected to /solana-sign: ${socket.id} (API Token: ${socket.data.apiToken?.name || 'unknown'})`);
 
         // Handle staking:get-tx-to-claim event
         socket.on('staking:get-tx-to-claim', async (data: { signature: string; includeInitTx: boolean }, callback: any) => {
@@ -272,7 +271,6 @@ export const initializeSocketIO = (httpServer: HTTPServer): SocketIOServer => {
 
         // Handle disconnection
         socket.on('disconnect', (reason: string) => {
-            console.log(`❌ Socket disconnected from /solana-sign: ${socket.id} (reason: ${reason})`);
         });
 
         // Handle errors
@@ -311,7 +309,6 @@ export const closeSocketIO = async (): Promise<void> => {
     if (io) {
         io.close();
         io = null;
-        console.log('🔌 Socket.io server closed');
     }
 };
 
