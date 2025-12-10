@@ -35,6 +35,7 @@ export type RequestTransactionWithInitResponse = Promise<{
     serializedInitTx: string | null,
     error: boolean,
     code: string
+    nonce: number
 }>
 
 

@@ -122,3 +122,8 @@ export const claimDepinStakerRewardsSchema = yup.object().shape({
   solanaAssetId: yup.string().required('Solana asset ID is required'),
   nonce: yup.number().required('Nonce is required')
 });
+
+export const verifyTransactionHashSchema = yup.object().shape({
+  serializedTransaction: yup.string().required('Serialized transaction is required'),
+  nonce: yup.number().required('Nonce is required').positive('Nonce must be positive')
+});

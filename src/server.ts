@@ -1,14 +1,16 @@
 import Koa from "koa";
+import http from "http";
 import bodyParser from "koa-bodyparser";
 import logger from "koa-logger";
 import { errorHandler } from "@middlewares/auth-validator";
 import { dbErrorHandler } from "@middlewares/db-error-handler";
-import  router from "@routes/api.routes";
+import router from "@routes/api.routes";
 import { ENV } from "@config/env/env";
 import cors from '@koa/cors';
 import { PRODUCTION_ORIGINS } from "@constants/api";
 import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
 import { AirdropsSystemManager } from "@services/solana/contracts/airdrop-system.manager";
+import { initializeSocketIO } from "@services/socket/socket.service";
 
 
 const app = new Koa();
@@ -35,7 +37,7 @@ app.use(router.allowedMethods());
 // Global error handling
 app.on('error', async (err, ctx) => {
   console.error('Server Error:', err);
-  
+
   // Check if it's a database connection error
   if (err.message.includes('Connection terminated unexpectedly')) {
     console.log('Database connection terminated. Attempting to reconnect...');
@@ -52,7 +54,7 @@ app.use(async (ctx, next) => {
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('Request timeout')), timeout);
   });
-  
+
   try {
     await Promise.race([next(), timeoutPromise]);
   } catch (error) {
@@ -65,8 +67,15 @@ app.use(async (ctx, next) => {
   }
 });
 
-// Initialize server
+// Create HTTP server from Koa app
 const PORT = Number(ENV.PORT);
-app.listen(PORT, '0.0.0.0', () => {
+const httpServer = http.createServer(app.callback());
+
+// Initialize Socket.io
+initializeSocketIO(httpServer);
+
+// Start server
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Socket.io server is running on ws://localhost:${PORT}`);
 });
