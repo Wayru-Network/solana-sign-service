@@ -211,8 +211,6 @@ export const verifyTransactionHashFromDb = async (
                     // Compare with the amount from DB (format both to 2 decimal places for comparison)
                     const formattedAmountFromDb = Number(amountToClaimFromDb).toFixed(2);
                     const formattedAmountFromTx = rewardAmountHumanReadable.toFixed(2);
-                    console.log("formattedAmountFromDb", formattedAmountFromDb);
-                    console.log("formattedAmountFromTx", formattedAmountFromTx);
 
                     if (Number(formattedAmountFromDb) !== Number(formattedAmountFromTx)) {
                         return {
