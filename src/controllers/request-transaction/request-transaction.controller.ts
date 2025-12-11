@@ -1,7 +1,35 @@
-import { CtxClaimDepinStakerRewards, CtxSignatureInside } from '@/interfaces/request-transaction/api';
-import { signatureInsideSchema } from '@/validations/request-transaction/request-transaction.validation';
-import { requestTransactionDepositTokens, requestTransactionDepositTokensV2, requestTransactionStakeTokens, requestTransactionStakeTokensV2, requestTransactionToClaimDepinStakerRewards, requestTransactionToClaimReward, requestTransactionToClaimRewardV2, requestTransactionToClaimWCredits, requestTransactionToInitializeNfnode, requestTransactionToInitializeNfnodeV2, requestTransactionToInitializeStakeEntry, requestTransactionToInitializeStakeEntryV2, requestTransactionToUpdateHost, requestTransactionToUpdateHostV2, requestTransactionToUpdateRewardContract, requestTransactionWithdrawStakedTokens, requestTransactionWithdrawStakedTokensV2, requestTransactionWithdrawTokens, requestTransactionWithdrawTokensV2 } from '@services/request-transaction/request-transaction.service';
-import { ValidationError } from 'yup';
+import {
+  CtxClaimDepinStakerRewards,
+  CtxSignAndSendTransaction,
+  CtxSignatureInside,
+} from "@/interfaces/request-transaction/api";
+import {
+  signatureInsideSchema,
+  verifyTransactionHashSchema,
+} from "@/validations/request-transaction/request-transaction.validation";
+import {
+  requestTransactionDepositTokens,
+  requestTransactionDepositTokensV2,
+  requestTransactionStakeTokens,
+  requestTransactionStakeTokensV2,
+  requestTransactionToClaimDepinStakerRewards,
+  requestTransactionToClaimReward,
+  requestTransactionToClaimRewardV2,
+  requestTransactionToClaimWCredits,
+  requestTransactionToInitializeNfnode,
+  requestTransactionToInitializeNfnodeV2,
+  requestTransactionToInitializeStakeEntry,
+  requestTransactionToInitializeStakeEntryV2,
+  requestTransactionToUpdateHost,
+  requestTransactionToUpdateHostV2,
+  requestTransactionToUpdateRewardContract,
+  requestTransactionWithdrawStakedTokens,
+  requestTransactionWithdrawStakedTokensV2,
+  requestTransactionWithdrawTokens,
+  requestTransactionWithdrawTokensV2,
+} from "@services/request-transaction/request-transaction.service";
+import { signAndSendTransaction } from "@services/request-transaction/sign-and-send.service";
+import { ValidationError } from "yup";
 
 export class RequestTransactionController {
   static async claimRewards(ctx: CtxSignatureInside) {
@@ -9,7 +37,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -20,31 +48,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: null
+          serializedTx: null,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -54,7 +81,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -65,31 +92,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: null
+          serializedTx: null,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -99,20 +125,23 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
       const includeInitTx = ctx.request.body?.includeInitTx as boolean;
       // prepare transaction
-      const response = await requestTransactionToClaimDepinStakerRewards(signature, includeInitTx);
+      const response = await requestTransactionToClaimDepinStakerRewards(
+        signature,
+        includeInitTx
+      );
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
           code: response.code,
           serializedTx: null,
-          serializedInitTx: null
+          serializedInitTx: null,
         };
       } else {
         ctx.status = 200;
@@ -120,24 +149,73 @@ export class RequestTransactionController {
           error: false,
           code: response.code,
           serializedTx: response.serializedTx,
-          serializedInitTx: response.serializedInitTx
+          serializedInitTx: response.serializedInitTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
+        };
+      }
+    }
+  }
+  static async signAndSendTransaction(ctx: CtxSignAndSendTransaction) {
+    try {
+      // validate request body
+      await verifyTransactionHashSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+
+      const serializedTransaction = ctx.request.body
+        ?.serializedTransaction as string;
+      const nonce = ctx.request.body?.nonce as number;
+
+      // verify transaction hash
+      const result = await signAndSendTransaction(serializedTransaction, nonce);
+
+      if (!result.isValid) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: result.code,
+          message: result.message,
+          isValid: false,
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: result.code,
+          message: result.message,
+          isValid: true,
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: "validation error",
+          errors: err.errors,
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: "internal server error",
         };
       }
     }
@@ -147,7 +225,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -158,31 +236,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -192,7 +269,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -203,31 +280,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -237,42 +313,43 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
-      const response = await requestTransactionToInitializeStakeEntry(signature);
+      const response = await requestTransactionToInitializeStakeEntry(
+        signature
+      );
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -282,42 +359,43 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
-      const response = await requestTransactionToInitializeStakeEntryV2(signature);
+      const response = await requestTransactionToInitializeStakeEntryV2(
+        signature
+      );
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -327,7 +405,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -338,31 +416,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -372,7 +449,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -383,31 +460,30 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
-
     } catch (err: unknown) {
       if (err instanceof ValidationError) {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
-          errors: err.errors
+          message: "validation error",
+          errors: err.errors,
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error'
+          message: "internal server error",
         };
       }
     }
@@ -417,7 +493,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -428,14 +504,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -443,17 +519,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'CWC-001'
+          code: "CWC-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'CWC-002'
+          message: "internal server error",
+          code: "CWC-002",
         };
       }
     }
@@ -463,7 +539,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -474,14 +550,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -489,17 +565,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'WT-001'
+          code: "WT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'WT-002'
+          message: "internal server error",
+          code: "WT-002",
         };
       }
     }
@@ -509,7 +585,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -520,14 +596,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -535,17 +611,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'WT-001'
+          code: "WT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'WT-002'
+          message: "internal server error",
+          code: "WT-002",
         };
       }
     }
@@ -555,7 +631,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -566,14 +642,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -581,17 +657,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'WT-001'
+          code: "WT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'WT-002'
+          message: "internal server error",
+          code: "WT-002",
         };
       }
     }
@@ -601,25 +677,27 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
-      const response = await requestTransactionWithdrawStakedTokensV2(signature);
+      const response = await requestTransactionWithdrawStakedTokensV2(
+        signature
+      );
       if (response.error || !response.serializedTx) {
         ctx.status = 400;
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -627,17 +705,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'WT-001'
+          code: "WT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'WT-002'
+          message: "internal server error",
+          code: "WT-002",
         };
       }
     }
@@ -647,7 +725,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -658,14 +736,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -673,17 +751,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'DT-001'
+          code: "DT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'DT-002'
+          message: "internal server error",
+          code: "DT-002",
         };
       }
     }
@@ -693,7 +771,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -704,14 +782,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -719,17 +797,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'DT-001'
+          code: "DT-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'DT-002'
+          message: "internal server error",
+          code: "DT-002",
         };
       }
     }
@@ -739,7 +817,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -750,14 +828,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -765,17 +843,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'ST-001'
+          code: "ST-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'ST-002'
+          message: "internal server error",
+          code: "ST-002",
         };
       }
     }
@@ -785,7 +863,7 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
@@ -796,14 +874,14 @@ export class RequestTransactionController {
         ctx.body = {
           error: true,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       } else {
         ctx.status = 200;
         ctx.body = {
           error: false,
           code: response.code,
-          serializedTx: response.serializedTx
+          serializedTx: response.serializedTx,
         };
       }
     } catch (err: unknown) {
@@ -811,17 +889,17 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'ST-001'
+          code: "ST-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'ST-002'
+          message: "internal server error",
+          code: "ST-002",
         };
       }
     }
@@ -831,15 +909,17 @@ export class RequestTransactionController {
       // validate request body
       await signatureInsideSchema.validate(ctx.request.body, {
         abortEarly: false,
-        stripUnknown: true
+        stripUnknown: true,
       });
 
       const signature = ctx.request.body?.signature as string;
       // prepare transaction
-      const response = await requestTransactionToUpdateRewardContract(signature);
+      const response = await requestTransactionToUpdateRewardContract(
+        signature
+      );
       if (response.error) {
         ctx.status = 400;
-        ctx.body = response
+        ctx.body = response;
       } else {
         ctx.status = 200;
         ctx.body = response;
@@ -849,17 +929,69 @@ export class RequestTransactionController {
         ctx.status = 400;
         ctx.body = {
           error: true,
-          message: 'validation error',
+          message: "validation error",
           errors: err.errors,
-          code: 'URC-001'
+          code: "URC-001",
         };
       } else {
         // for other types of errors
         ctx.status = 500;
         ctx.body = {
           error: true,
-          message: 'internal server error',
-          code: 'URC-002'
+          message: "internal server error",
+          code: "URC-002",
+        };
+      }
+    }
+  }
+  static async claimDepinStakerRewardsV2(ctx: CtxClaimDepinStakerRewards) {
+    try {
+      // validate request body
+      await signatureInsideSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+
+      const signature = ctx.request.body?.signature as string;
+      const includeInitTx = ctx.request.body?.includeInitTx as boolean;
+      const includeAdminAuthorization = false;
+      // prepare transaction
+      const response = await requestTransactionToClaimDepinStakerRewards(
+        signature,
+        includeInitTx,
+        includeAdminAuthorization
+      );
+      if (response.error || !response.serializedTx) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          code: response.code,
+          serializedTx: null,
+          serializedInitTx: null,
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          code: response.code,
+          serializedTx: response.serializedTx,
+          serializedInitTx: response.serializedInitTx,
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: "validation error",
+          errors: err.errors,
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: "internal server error",
         };
       }
     }
