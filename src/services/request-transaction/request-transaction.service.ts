@@ -33,6 +33,7 @@ import {
   prepareAccountsToClaimReward,
   verifyTransactionSignature,
   processMessageData,
+  createTransactionHash,
 } from "@helpers/request-transaction/request-transaction.helper";
 import { getRewardTokenMint } from "@helpers/solana/solana.helpers";
 import { validateAndUpdateSignatureStatus, verifyTxTrackerToClaimDepinStakerRewards } from "../transaction-tracker/transaction-tracker.service";
@@ -920,7 +921,8 @@ export const requestTransactionToClaimRewardV2 = async (
  */
 export const requestTransactionToClaimDepinStakerRewards = async (
   signature: string,
-  includeInitTx: boolean
+  includeInitTx: boolean,
+  includeAdminAuthorization: boolean = true
 ): RequestTransactionWithInitResponse => {
   let nonceFDB: number | undefined;
   try {
@@ -929,6 +931,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce: 0,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_SIGNATURE_ERROR_CODE,
       };
@@ -938,6 +941,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce: 0,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE,
       };
@@ -969,6 +973,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce,
         error: true,
         code: code,
       };
@@ -997,6 +1002,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
         return {
           serializedTx: null,
           serializedInitTx: null,
+          nonce,
           error: true,
           code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_INITIALIZE_NFNODE_ERROR_CODE,
         };
@@ -1034,6 +1040,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
       };
@@ -1049,6 +1056,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_PREPARED_ACCOUNTS_ERROR_CODE,
       };
@@ -1073,7 +1081,11 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     );
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = user;
-    tx.partialSign(adminKeypair);
+
+    // admin sign the transaction
+    if (includeAdminAuthorization) {
+      tx.partialSign(adminKeypair);
+    }
 
     // serialize tx
     const serializedTx = tx.serialize({
@@ -1083,15 +1095,20 @@ export const requestTransactionToClaimDepinStakerRewards = async (
 
     const txBase64 = serializedTx.toString("base64");
 
+    // create hash transaction to claim rewards
+    const hashTransaction = createTransactionHash(tx);
+
     // update the status of claim reward history because the admin has authorized the claim
     const updatedTransactionTracker = await updateTransactionTrackerStatus(
       nonce,
-      "request_authorized_by_admin"
+      "request_authorized_by_admin",
+      hashTransaction
     );
     if (!updatedTransactionTracker) {
       return {
         serializedTx: null,
         serializedInitTx: null,
+        nonce,
         error: true,
         code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_UPDATE_CLAIM_REWARD_HISTORY_ERROR_CODE,
       };
@@ -1100,6 +1117,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     return {
       serializedTx: txBase64,
       serializedInitTx: serializedInitTx,
+      nonce,
       error: false,
       code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_SUCCESS_CODE,
     };
@@ -1114,6 +1132,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     return {
       serializedTx: null,
       serializedInitTx: null,
+      nonce: 0,
       error: true,
       code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_ERROR_CODE,
     };

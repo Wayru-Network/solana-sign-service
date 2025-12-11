@@ -7,6 +7,7 @@ import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
 import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema, claimDepinStakerRewardsSchema } from "@validations/request-transaction/request-transaction.validation";
 import nacl from 'tweetnacl';
+import { createHash } from "crypto";
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -248,5 +249,69 @@ export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: b
     } catch (error) {
         console.error('JSON parse error:', error);
         return { data: null, error: true };
+    }
+};
+
+/**
+ * Creates a hash of a Solana transaction without signatures
+ * This hash can be used to verify that a transaction returned by the user
+ * is the same one that was originally created by the backend
+ * 
+ * @param {Transaction} transaction - The Solana transaction to hash
+ * @returns {string} - SHA256 hash of the transaction (hex string)
+ */
+export const createTransactionHash = (transaction: Transaction): string => {
+    try {
+        // Create a copy of the transaction to avoid modifying the original
+        const txCopy = new Transaction();
+
+        // Copy all properties except signatures
+        txCopy.feePayer = transaction.feePayer;
+        txCopy.recentBlockhash = transaction.recentBlockhash;
+        txCopy.lastValidBlockHeight = transaction.lastValidBlockHeight;
+        txCopy.nonceInfo = transaction.nonceInfo;
+
+        // Copy all instructions
+        transaction.instructions.forEach(ix => {
+            txCopy.add(ix);
+        });
+
+        // Serialize the transaction without signatures
+        const serializedTx = txCopy.serialize({
+            requireAllSignatures: false,
+            verifySignatures: false,
+        });
+
+        // Calculate SHA256 hash
+        // serialize() returns a Buffer, which is compatible with createHash
+        const hash = createHash('sha256')
+            .update(serializedTx as any)
+            .digest('hex');
+
+        return hash;
+    } catch (error) {
+        console.error('Error creating transaction hash:', error);
+        throw new Error('Failed to create transaction hash');
+    }
+};
+
+/**
+ * Verifies that a transaction (which may have user signatures) matches the expected hash
+ * This function removes all signatures before calculating the hash to compare
+ * 
+ * @param {Transaction} transaction - The transaction to verify (may have user signatures)
+ * @param {string} expectedHash - The expected hash to compare against
+ * @returns {boolean} - True if the transaction matches the expected hash
+ */
+export const verifyTransactionHash = (transaction: Transaction, expectedHash: string): boolean => {
+    try {
+        // Calculate the hash of the transaction without signatures
+        const actualHash = createTransactionHash(transaction);
+
+        // Compare hashes
+        return actualHash === expectedHash;
+    } catch (error) {
+        console.error('Error verifying transaction hash:', error);
+        return false;
     }
 };

@@ -3,7 +3,7 @@ import { User } from '../user';
 
 export interface CtxBase<T = any> extends Context {
     state: {
-        user: User
+        user?: User;
     }
     request: {
         body?: T
@@ -21,6 +21,10 @@ export interface RouteConfig {
      * Additional middlewares to apply to this route
      */
     middlewares?: Middleware[];
+    /**
+     * Whether this route requires rate limiting (default: false)
+     */
+    rateLimiter?: boolean;
 }
 
 export interface Route<T = any> {
