@@ -307,8 +307,6 @@ export const verifyTransactionHash = (transaction: Transaction, expectedHash: st
     try {
         // Calculate the hash of the transaction without signatures
         const actualHash = createTransactionHash(transaction);
-        console.log('actualHash', actualHash);
-        console.log('expectedHash', expectedHash);
 
         // Compare hashes
         return actualHash === expectedHash;

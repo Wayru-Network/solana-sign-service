@@ -1,11 +1,9 @@
 import { Context, Middleware } from 'koa';
 import { User } from '../user';
-import { ApiToken } from '@/services/api-token/api-token.service';
 
 export interface CtxBase<T = any> extends Context {
     state: {
         user?: User;
-        apiToken?: ApiToken;
     }
     request: {
         body?: T
@@ -19,11 +17,6 @@ export interface RouteConfig {
      * Whether this route requires authentication (default: true)
      */
     auth?: boolean;
-    /**
-     * Whether this route requires API key authentication (default: false)
-     * If true, the X-API-TOKEN header will be validated
-     */
-    apiKeyAuth?: boolean;
     /**
      * Additional middlewares to apply to this route
      */

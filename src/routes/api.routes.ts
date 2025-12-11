@@ -1,6 +1,5 @@
 import Router from 'koa-router';
 import { authValidator } from '@/middlewares/auth-validator';
-import { apiKeyAuth } from '@/middlewares/api-key-auth';
 import { routes as transactionRoutes } from "@/routes/request-transaction/request-transaction.route";
 import { routes as simulateRoutes } from "@/routes/request-transaction/simulate-request-transaction";
 import { ROUTES } from "@/routes/routes";
@@ -15,15 +14,10 @@ const mainRouter = new Router({
 function registerRoutes(router: Router, routes: Route[], basePath: string) {
   routes.forEach(route => {
     const requiresAuth = route.config?.auth !== false; // Default to true if not specified
-    const requiresApiKeyAuth = route.config?.apiKeyAuth === true; // Default to false
     const middlewares: any[] = [];
 
-    // Add API key auth middleware if required (takes precedence over JWT auth)
-    if (requiresApiKeyAuth) {
-      middlewares.push(apiKeyAuth);
-    }
+    // Add JWT auth middleware if required
     if (requiresAuth) {
-      // Add JWT auth middleware if required and API key auth is not used
       middlewares.push(authValidator);
     }
 

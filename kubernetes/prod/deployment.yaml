@@ -61,11 +61,11 @@ spec:
                 secretKeyRef:
                   name: signature-service-secrets
                   key: SOLANA_API_KEY
-            - name: API_TOKEN_SALT
+            - name: SOCKETS_SALT
               valueFrom:
                 secretKeyRef:
                   name: signature-service-secrets
-                  key: API_TOKEN_SALT
+                  key: SOCKETS_SALT
         ports:
         - containerPort: 80
         resources:
