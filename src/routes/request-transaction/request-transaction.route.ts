@@ -1,6 +1,6 @@
 import Router from 'koa-router';
 import { Route } from '@/interfaces/api/api';
-import { CtxClaimDepinStakerRewards, CtxSignatureInside } from '@/interfaces/request-transaction/api';
+import { CtxClaimDepinStakerRewards, CtxSignatureInside, CtxSignAndSendTransaction } from '@/interfaces/request-transaction/api';
 import { RequestTransactionController } from '@/controllers/request-transaction/request-transaction.controller';
 const router = new Router();
 
@@ -139,6 +139,16 @@ const routes: Route[] = [
     path: '/to-initialize-nfnode-v2',
     handler: async (ctx: CtxSignatureInside) => {
       await RequestTransactionController.initializeNfnodeV2(ctx);
+    }
+  },
+  {
+    method: 'post',
+    path: '/verify-transaction-hash',
+    handler: async (ctx: CtxSignAndSendTransaction) => {
+      await RequestTransactionController.verifyTransactionHash(ctx);
+    },
+    config: {
+      auth: false // Set to false to make this route public (no authentication required)
     }
   },
 ];
