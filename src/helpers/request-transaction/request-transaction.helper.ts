@@ -257,35 +257,50 @@ export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: b
  * This hash can be used to verify that a transaction returned by the user
  * is the same one that was originally created by the backend
  * 
+ * Uses compileMessage() to get the canonical message representation,
+ * which is more reliable than manually copying transaction properties
+ * and handles versioned transactions and address lookup tables correctly
+ * 
  * @param {Transaction} transaction - The Solana transaction to hash
  * @returns {string} - SHA256 hash of the transaction (hex string)
  */
 export const createTransactionHash = (transaction: Transaction): string => {
     try {
-        // Create a copy of the transaction to avoid modifying the original
+        // Create a clean transaction copy to ensure consistent hashing
+        // This ensures that we're hashing the same structure regardless of signature state
         const txCopy = new Transaction();
 
-        // Copy all properties except signatures
+        // Copy essential properties
         txCopy.feePayer = transaction.feePayer;
         txCopy.recentBlockhash = transaction.recentBlockhash;
         txCopy.lastValidBlockHeight = transaction.lastValidBlockHeight;
         txCopy.nonceInfo = transaction.nonceInfo;
 
-        // Copy all instructions
+        // Copy all instructions in the same order
         transaction.instructions.forEach(ix => {
             txCopy.add(ix);
         });
 
-        // Serialize the transaction without signatures
-        const serializedTx = txCopy.serialize({
-            requireAllSignatures: false,
-            verifySignatures: false,
+        // Use compileMessage() to get the canonical message representation
+        // This method generates the message that would be signed, without any signatures
+        // It correctly handles all transaction properties including versioned transactions
+        const message = txCopy.compileMessage();
+        const serializedMessage = message.serialize();
+
+        // Debug: Log message details
+        console.log('Message details:', {
+            header: message.header,
+            accountKeysLength: message.accountKeys.length,
+            recentBlockhash: message.recentBlockhash,
+            instructionsLength: message.instructions.length,
+            serializedLength: serializedMessage.length,
+            feePayer: txCopy.feePayer?.toString()
         });
 
-        // Calculate SHA256 hash
+        // Calculate SHA256 hash of the serialized message
         // serialize() returns a Buffer, which is compatible with createHash
         const hash = createHash('sha256')
-            .update(serializedTx as any)
+            .update(serializedMessage as any)
             .digest('hex');
 
         return hash;
@@ -307,6 +322,7 @@ export const verifyTransactionHash = (transaction: Transaction, expectedHash: st
     try {
         // Calculate the hash of the transaction without signatures
         const actualHash = createTransactionHash(transaction);
+        console.log('actualHash', actualHash);
 
         // Compare hashes
         return actualHash === expectedHash;

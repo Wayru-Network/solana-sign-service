@@ -34,6 +34,13 @@ export const initializeSocketIO = (httpServer: HTTPServer): SocketIOServer => {
                     return callback(null, true);
                 }
 
+                // In production, block localhost origins
+                if (ENV.NODE_ENV === 'production') {
+                    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+                        return callback(new Error(`Not allowed by CORS: Localhost origins are blocked in production`));
+                    }
+                }
+
                 // Check if origin is in allowed list
                 if (allowedOrigins.includes(origin)) {
                     callback(null, true);
@@ -149,7 +156,7 @@ export const initializeSocketIO = (httpServer: HTTPServer): SocketIOServer => {
                 const disconnectReason = socket.data.disconnectReason;
 
                 // Emit the custom disconnect reason - frontend will receive this
-                // Frontend debe escuchar: socket.on('disconnect-reason', (reason) => { ... })
+                // Frontend should listen to: socket.on('disconnect-reason', (reason) => { ... })
                 try {
                     socket.emit('disconnect-reason', disconnectReason);
                 } catch (error: any) {
