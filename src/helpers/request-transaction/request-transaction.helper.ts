@@ -2,7 +2,7 @@ import { PrepareAccountsToClaimReward, PrepareParamsToClaimReward, PayloadProces
 import { getUserNFTTokenAccount } from "@/services/solana/solana.service";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, ComputeBudgetProgram } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
 import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema, claimDepinStakerRewardsSchema } from "@validations/request-transaction/request-transaction.validation";
@@ -102,7 +102,7 @@ export const prepareAccountsToClaimReward = async ({ program, mint, userWallet, 
             userTokenAccount,
             userNftTokenAccount: userNFTTokenAccount,
             adminAccount,
-            tokenProgram2022: TOKEN_2022_PROGRAM_ID,  // Añadido de nuevo
+            tokenProgram2022: TOKEN_2022_PROGRAM_ID,
             tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
@@ -253,6 +253,90 @@ export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: b
 };
 
 /**
+ * Normalizes a transaction by filtering out ComputeBudgetProgram instructions
+ * This is necessary because wallets may add/modify these instructions when the user has SOL,
+ * but won't add them when the user doesn't have SOL, causing hash mismatches
+ * 
+ * @param {Transaction} transaction - The transaction to normalize
+ * @param {string} context - Context for logging (e.g., 'original' or 'user')
+ * @returns {Transaction} - A new transaction with ComputeBudgetProgram instructions filtered out
+ */
+const normalizeTransaction = (transaction: Transaction, context: string = 'unknown'): Transaction => {
+    const normalizedTx = new Transaction();
+
+    // Copy essential properties
+    normalizedTx.feePayer = transaction.feePayer;
+    normalizedTx.recentBlockhash = transaction.recentBlockhash;
+    normalizedTx.lastValidBlockHeight = transaction.lastValidBlockHeight;
+    normalizedTx.nonceInfo = transaction.nonceInfo;
+
+    // Filter out ComputeBudgetProgram instructions
+    // Wallets may add/modify these instructions, so we exclude them for consistent hashing
+    const computeBudgetProgramId = ComputeBudgetProgram.programId;
+
+    // Log all instructions before filtering
+    const allInstructions = transaction.instructions.map((ix, idx) => {
+        const isComputeBudget = ix.programId.equals(computeBudgetProgramId);
+        return {
+            index: idx,
+            programId: ix.programId.toString(),
+            isComputeBudget,
+            dataLength: ix.data.length,
+            keysCount: ix.keys.length,
+            // Try to identify instruction type
+            instructionType: isComputeBudget
+                ? (ix.data.length === 4 ? 'setComputeUnitLimit' : ix.data.length === 8 ? 'setComputeUnitPrice' : 'unknown')
+                : 'other'
+        };
+    });
+
+    console.log(`[${context}] All instructions before filtering:`, {
+        totalInstructions: transaction.instructions.length,
+        instructions: allInstructions
+    });
+
+    const filteredInstructions = transaction.instructions.filter(ix => {
+        return !ix.programId.equals(computeBudgetProgramId);
+    });
+
+    const computeBudgetInstructions = transaction.instructions.filter(ix => {
+        return ix.programId.equals(computeBudgetProgramId);
+    });
+
+    console.log(`[${context}] Filtering results:`, {
+        totalInstructions: transaction.instructions.length,
+        computeBudgetInstructionsCount: computeBudgetInstructions.length,
+        filteredInstructionsCount: filteredInstructions.length,
+        computeBudgetInstructions: computeBudgetInstructions.map((ix, idx) => ({
+            index: idx,
+            dataLength: ix.data.length,
+            data: Array.from(ix.data.slice(0, 8)) // First 8 bytes to identify type
+        }))
+    });
+
+    // Add filtered instructions
+    filteredInstructions.forEach(ix => {
+        normalizedTx.add(ix);
+    });
+
+    // Log filtered instructions details
+    const filteredInstructionsDetails = filteredInstructions.map((ix, idx) => ({
+        index: idx,
+        programId: ix.programId.toString(),
+        dataLength: ix.data.length,
+        keysCount: ix.keys.length,
+        firstAccount: ix.keys[0]?.pubkey?.toString() || 'N/A'
+    }));
+
+    console.log(`[${context}] Filtered instructions (after removing ComputeBudgetProgram):`, {
+        count: filteredInstructions.length,
+        instructions: filteredInstructionsDetails
+    });
+
+    return normalizedTx;
+};
+
+/**
  * Creates a hash of a Solana transaction without signatures
  * This hash can be used to verify that a transaction returned by the user
  * is the same one that was originally created by the backend
@@ -261,40 +345,47 @@ export const safeJsonParse = <T>(jsonString: string): { data: T | null; error: b
  * which is more reliable than manually copying transaction properties
  * and handles versioned transactions and address lookup tables correctly
  * 
+ * Normalizes the transaction by filtering ComputeBudgetProgram instructions to handle
+ * cases where wallets add these instructions when the user has SOL but not when they don't
+ * 
  * @param {Transaction} transaction - The Solana transaction to hash
  * @returns {string} - SHA256 hash of the transaction (hex string)
  */
-export const createTransactionHash = (transaction: Transaction): string => {
+export const createTransactionHash = (transaction: Transaction, context: string = 'unknown'): string => {
     try {
-        // Create a clean transaction copy to ensure consistent hashing
-        // This ensures that we're hashing the same structure regardless of signature state
-        const txCopy = new Transaction();
-
-        // Copy essential properties
-        txCopy.feePayer = transaction.feePayer;
-        txCopy.recentBlockhash = transaction.recentBlockhash;
-        txCopy.lastValidBlockHeight = transaction.lastValidBlockHeight;
-        txCopy.nonceInfo = transaction.nonceInfo;
-
-        // Copy all instructions in the same order
-        transaction.instructions.forEach(ix => {
-            txCopy.add(ix);
+        console.log(`[createTransactionHash:${context}] Starting hash creation`, {
+            feePayer: transaction.feePayer?.toString(),
+            recentBlockhash: transaction.recentBlockhash,
+            lastValidBlockHeight: transaction.lastValidBlockHeight,
+            instructionsCount: transaction.instructions.length,
+            signaturesCount: transaction.signatures.length
         });
+
+        // Normalize the transaction to filter out ComputeBudgetProgram instructions
+        // This ensures consistent hashing regardless of wallet modifications
+        const normalizedTx = normalizeTransaction(transaction, context);
 
         // Use compileMessage() to get the canonical message representation
         // This method generates the message that would be signed, without any signatures
         // It correctly handles all transaction properties including versioned transactions
-        const message = txCopy.compileMessage();
+        const message = normalizedTx.compileMessage();
         const serializedMessage = message.serialize();
 
         // Debug: Log message details
-        console.log('Message details:', {
-            header: message.header,
+        console.log(`[createTransactionHash:${context}] Compiled message details:`, {
+            header: {
+                numRequiredSignatures: message.header.numRequiredSignatures,
+                numReadonlySignedAccounts: message.header.numReadonlySignedAccounts,
+                numReadonlyUnsignedAccounts: message.header.numReadonlyUnsignedAccounts
+            },
             accountKeysLength: message.accountKeys.length,
+            accountKeys: message.accountKeys.map(key => key.toString()),
             recentBlockhash: message.recentBlockhash,
             instructionsLength: message.instructions.length,
+            originalInstructionsCount: transaction.instructions.length,
+            filteredInstructionsCount: normalizedTx.instructions.length,
             serializedLength: serializedMessage.length,
-            feePayer: txCopy.feePayer?.toString()
+            feePayer: normalizedTx.feePayer?.toString()
         });
 
         // Calculate SHA256 hash of the serialized message
@@ -303,9 +394,11 @@ export const createTransactionHash = (transaction: Transaction): string => {
             .update(serializedMessage as any)
             .digest('hex');
 
+        console.log(`[createTransactionHash:${context}] Hash created successfully:`, hash);
+
         return hash;
     } catch (error) {
-        console.error('Error creating transaction hash:', error);
+        console.error(`[createTransactionHash:${context}] Error creating transaction hash:`, error);
         throw new Error('Failed to create transaction hash');
     }
 };
@@ -320,14 +413,37 @@ export const createTransactionHash = (transaction: Transaction): string => {
  */
 export const verifyTransactionHash = (transaction: Transaction, expectedHash: string): boolean => {
     try {
+        console.log('[verifyTransactionHash] Starting verification', {
+            expectedHash,
+            transactionInstructionsCount: transaction.instructions.length,
+            transactionSignaturesCount: transaction.signatures.length
+        });
+
         // Calculate the hash of the transaction without signatures
-        const actualHash = createTransactionHash(transaction);
-        console.log('actualHash', actualHash);
+        const actualHash = createTransactionHash(transaction, 'verification');
+
+        console.log('[verifyTransactionHash] Hash comparison:', {
+            expectedHash,
+            actualHash,
+            match: actualHash === expectedHash
+        });
 
         // Compare hashes
-        return actualHash === expectedHash;
+        const isValid = actualHash === expectedHash;
+
+        if (!isValid) {
+            console.warn('[verifyTransactionHash] Hash mismatch detected!', {
+                expectedHash,
+                actualHash,
+                difference: expectedHash !== actualHash ? 'Hashes do not match' : 'Unknown issue'
+            });
+        } else {
+            console.log('[verifyTransactionHash] Hash verification successful!');
+        }
+
+        return isValid;
     } catch (error) {
-        console.error('Error verifying transaction hash:', error);
+        console.error('[verifyTransactionHash] Error verifying transaction hash:', error);
         return false;
     }
 };
