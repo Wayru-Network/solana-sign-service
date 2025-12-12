@@ -1096,22 +1096,7 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     const txBase64 = serializedTx.toString("base64");
 
     // create hash transaction to claim rewards
-    // Log transaction details before creating hash
-    console.log('[requestTransactionToClaimRewardV2] Creating hash for original transaction:', {
-      feePayer: tx.feePayer?.toString(),
-      recentBlockhash: tx.recentBlockhash,
-      lastValidBlockHeight: tx.lastValidBlockHeight,
-      instructionsCount: tx.instructions.length,
-      signaturesCount: tx.signatures.length,
-      instructions: tx.instructions.map((ix, idx) => ({
-        index: idx,
-        programId: ix.programId.toString(),
-        dataLength: ix.data.length,
-        keysCount: ix.keys.length
-      }))
-    });
     const hashTransaction = createTransactionHash(tx, 'original-creation');
-    console.log('[requestTransactionToClaimRewardV2] Original hash created:', hashTransaction);
 
     // update the status of claim reward history because the admin has authorized the claim
     const updatedTransactionTracker = await updateTransactionTrackerStatus(
