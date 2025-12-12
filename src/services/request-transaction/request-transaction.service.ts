@@ -1098,11 +1098,11 @@ export const requestTransactionToClaimDepinStakerRewards = async (
     // create hash transaction to claim rewards
     // Log transaction details before creating hash
     console.log('Creating hash for original transaction:', {
-        feePayer: tx.feePayer?.toString(),
-        recentBlockhash: tx.recentBlockhash,
-        lastValidBlockHeight: tx.lastValidBlockHeight,
-        instructionsCount: tx.instructions.length,
-        signaturesCount: tx.signatures.length
+      feePayer: tx.feePayer?.toString(),
+      recentBlockhash: tx.recentBlockhash,
+      lastValidBlockHeight: tx.lastValidBlockHeight,
+      instructionsCount: tx.instructions.length,
+      signaturesCount: tx.signatures.length
     });
     const hashTransaction = createTransactionHash(tx);
     console.log('Original hash created:', hashTransaction);
