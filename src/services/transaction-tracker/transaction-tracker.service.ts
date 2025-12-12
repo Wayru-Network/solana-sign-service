@@ -105,6 +105,7 @@ export const verifyTransactionHashFromDb = async (
     nonce: number
 ): Promise<{ isValid: boolean, code?: string, message?: string }> => {
     try {
+        console.log('serializedTransaction', serializedTransaction);
         if (!nonce) {
             return {
                 isValid: false,
