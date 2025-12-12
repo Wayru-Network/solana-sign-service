@@ -29,6 +29,7 @@ import {
   requestTransactionWithdrawTokensV2,
 } from "@services/request-transaction/request-transaction.service";
 import { signAndSendTransaction } from "@services/request-transaction/sign-and-send.service";
+import { verifyTransactionHashFromDb } from "@services/transaction-tracker/transaction-tracker.service";
 import { ValidationError } from "yup";
 
 export class RequestTransactionController {
@@ -976,6 +977,56 @@ export class RequestTransactionController {
           code: response.code,
           serializedTx: response.serializedTx,
           serializedInitTx: response.serializedInitTx,
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof ValidationError) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          message: "validation error",
+          errors: err.errors,
+        };
+      } else {
+        // for other types of errors
+        ctx.status = 500;
+        ctx.body = {
+          error: true,
+          message: "internal server error",
+        };
+      }
+    }
+  }
+
+  static async verifyTransactionHash(ctx: CtxSignAndSendTransaction) {
+    try {
+      // validate request body
+      await verifyTransactionHashSchema.validate(ctx.request.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+
+      const serializedTransaction = ctx.request.body?.serializedTransaction as string;
+      const nonce = ctx.request.body?.nonce as number;
+
+      // Verify the transaction hash
+      const result = await verifyTransactionHashFromDb(serializedTransaction, nonce);
+
+      if (!result.isValid) {
+        ctx.status = 400;
+        ctx.body = {
+          error: true,
+          isValid: false,
+          code: result.code,
+          message: result.message,
+        };
+      } else {
+        ctx.status = 200;
+        ctx.body = {
+          error: false,
+          isValid: true,
+          code: result.code,
+          message: result.message,
         };
       }
     } catch (err: unknown) {
