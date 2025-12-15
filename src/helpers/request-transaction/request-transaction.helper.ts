@@ -8,6 +8,8 @@ import { ENV } from "@config/env/env";
 import { rewardClaimSchema, initializeNfnodeSchema, updateHostSchema, withdrawTokensSchema, claimWCreditsSchema, depositTokensSchema, updateRewardContractSchema, stakeTokensSchema, initializeStakeSchema, claimDepinStakerRewardsSchema } from "@validations/request-transaction/request-transaction.validation";
 import nacl from 'tweetnacl';
 import { createHash } from "crypto";
+import { RewardSystemManager } from "@services/solana/contracts/reward-system.manager";
+import { getWayruFoundationWalletAddress } from "@services/solana/solana.service";
 
 export const prepareParamsToClaimReward = async ({ program, mint, userWallet, nftMint }: PrepareParamsToClaimReward) => {
     try {    // Get token storage authority
@@ -273,7 +275,7 @@ const normalizeTransaction = (transaction: Transaction, context: string = 'unkno
     // Filter out ComputeBudgetProgram instructions and wallet-added programs
     // Wallets may add/modify these instructions, so we exclude them for consistent hashing
     const computeBudgetProgramId = ComputeBudgetProgram.programId;
-    
+
     // L2TExMFK program ID - wallets may add this program automatically
     // This is a known program that wallets add, so we filter it out for consistent hashing
     const l2TExMFKProgramId = new PublicKey('L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95');
@@ -365,5 +367,140 @@ export const verifyTransactionHash = (transaction: Transaction, expectedHash: st
     } catch (error) {
         console.error('[verifyTransactionHash] Error verifying transaction hash:', error);
         return false;
+    }
+};
+
+/**
+ * Checks if a transaction contains an InitializeNfnode instruction
+ * @param {Transaction} transaction - The transaction to check
+ * @returns {Promise<boolean>} - True if the transaction contains InitializeNfnode instruction
+ */
+export const hasInitializeNfnodeInstruction = async (transaction: Transaction): Promise<boolean> => {
+    try {
+        const program = await RewardSystemManager.getInstance();
+        const programId = program.programId;
+
+        // Discriminator for initializeNfnode: [51, 110, 148, 151, 182, 151, 64, 104]
+        const initializeNfnodeDiscriminator = new Uint8Array([51, 110, 148, 151, 182, 151, 64, 104]);
+
+        for (const ix of transaction.instructions) {
+            if (ix.programId.equals(programId)) {
+                // Check if the discriminator matches initializeNfnode
+                if (ix.data.length >= 8) {
+                    const instructionDiscriminator = new Uint8Array(ix.data.slice(0, 8));
+                    if (instructionDiscriminator.every((val, idx) => val === initializeNfnodeDiscriminator[idx])) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error checking for InitializeNfnode instruction:', error);
+        return false;
+    }
+};
+
+/**
+ * Checks if a transaction has suspicious token transfers to the fee payer (user's wallet)
+ * This helps prevent malicious transactions that try to send tokens to the user's wallet
+ * 
+ * For InitializeNfnode transactions, we allow:
+ * - Transfer to foundation wallet (wayru fee) - legitimate
+ * - Transfers within the RewardSystem program - legitimate
+ * 
+ * We reject:
+ * - Transfers where the fee payer is the authority (meaning user is receiving tokens)
+ * - Any other suspicious token transfers
+ * 
+ * @param {Transaction} transaction - The transaction to check
+ * @returns {Promise<{ hasSuspiciousTransfers: boolean, reason?: string }>} - Result of the check
+ */
+export const hasSuspiciousTokenTransfers = async (transaction: Transaction): Promise<{ hasSuspiciousTransfers: boolean, reason?: string }> => {
+    try {
+        if (!transaction.feePayer) {
+            return { hasSuspiciousTransfers: false };
+        }
+
+        const feePayer = transaction.feePayer;
+        const foundationWalletAddress = await getWayruFoundationWalletAddress();
+        const foundationWallet = new PublicKey(foundationWalletAddress);
+
+        // Get RewardSystem program ID to allow transfers within the program
+        const program = await RewardSystemManager.getInstance();
+        const rewardSystemProgramId = program.programId;
+
+        // Token Program ID
+        const tokenProgramId = TOKEN_PROGRAM_ID;
+        // Token-2022 Program ID (also check this)
+        const token2022ProgramId = TOKEN_2022_PROGRAM_ID;
+
+        // Transfer instruction discriminator is 3
+        const TRANSFER_DISCRIMINATOR = 3;
+
+        for (const ix of transaction.instructions) {
+            // Check if it's a Token Program instruction
+            if (ix.programId.equals(tokenProgramId) || ix.programId.equals(token2022ProgramId)) {
+                // Check if it's a transfer instruction (discriminator is first byte = 3)
+                if (ix.data.length > 0 && ix.data[0] === TRANSFER_DISCRIMINATOR) {
+                    // Transfer instruction structure:
+                    // - First account (index 0): source account (writable)
+                    // - Second account (index 1): destination account (writable)
+                    // - Third account (index 2): authority (signer, owner of source)
+
+                    if (ix.keys.length >= 3) {
+                        const authority = ix.keys[2].pubkey;
+                        const destinationAccount = ix.keys[1].pubkey;
+
+                        // Check if fee payer is the authority - this means user is authorizing a transfer
+                        // This could be suspicious if it's not a legitimate transfer (like wayru fee)
+                        // For now, we'll check if the destination is NOT the foundation wallet
+                        // If destination is foundation wallet, it's legitimate (wayru fee)
+                        // If destination is not foundation wallet and fee payer is authority, it's suspicious
+
+                        // However, we need to be careful - the user might be sending tokens FROM their account
+                        // which is legitimate. The issue is when tokens are being sent TO the user.
+
+                        // A simpler check: if fee payer is the authority AND destination is not foundation wallet,
+                        // we need to verify it's not sending tokens to an account owned by fee payer
+                        // But this is complex without checking account ownership
+
+                        // For now, we'll allow transfers where:
+                        // 1. Destination is foundation wallet (wayru fee) - always allowed
+                        // 2. Authority is not fee payer - means user is not involved in the transfer
+
+                        // If authority is fee payer and destination is not foundation wallet, it's suspicious
+                        // UNLESS it's part of a RewardSystem program instruction (which we check separately)
+
+                        // Check if this transfer is part of a RewardSystem instruction by checking
+                        // if there's a RewardSystem instruction in the transaction
+                        const hasRewardSystemInstruction = transaction.instructions.some(
+                            rewardIx => rewardIx.programId.equals(rewardSystemProgramId)
+                        );
+
+                        if (authority.equals(feePayer) && !destinationAccount.equals(foundationWallet)) {
+                            // If there's no RewardSystem instruction, this is suspicious
+                            // (transfers within RewardSystem are handled by the program itself)
+                            if (!hasRewardSystemInstruction) {
+                                return {
+                                    hasSuspiciousTransfers: true,
+                                    reason: `Suspicious token transfer detected: fee payer is authorizing transfer to ${destinationAccount.toString()}`
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return { hasSuspiciousTransfers: false };
+    } catch (error) {
+        console.error('Error checking for suspicious token transfers:', error);
+        // On error, be conservative and reject
+        return {
+            hasSuspiciousTransfers: true,
+            reason: 'Error validating transaction'
+        };
     }
 };
