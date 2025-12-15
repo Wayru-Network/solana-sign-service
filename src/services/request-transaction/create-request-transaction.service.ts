@@ -41,6 +41,7 @@ interface CreateTransactionToInitializeNfnodeParams {
     hostAddress?: string;
     manufacturerAddress?: string;
     forSimulation?: boolean; // Flag to determine if this is for simulation or real transaction
+    includeAdminAuthorization?: boolean;
 }
 
 interface CreateOnlyInitializeNfnodeTxParams {
@@ -78,6 +79,7 @@ export const createTransactionToInitializeNfnode = async (
             manufacturerAddress: manufacturerAddress,
             solanaAssetId: params.nftMintAddress,
             nfnodeType: params.nfnodeType,
+            includeAdminAuthorization: params.includeAdminAuthorization,
         })
         if (!serializedTx || !transaction) {
             return {
@@ -143,12 +145,14 @@ interface CreateOnlyInitializeNfnodeTxParams {
     manufacturerAddress: string;
     solanaAssetId: string;
     nfnodeType: InitializeNfnodeMessage["nfnodeType"];
+    includeAdminAuthorization?: boolean;
 }
 const createOnlyInitializeNfnodeTx = async (
     params: CreateOnlyInitializeNfnodeTxParams
 ) => {
     try {
         const {
+            includeAdminAuthorization = true,
             walletOwnerAddress,
             hostAddress,
             manufacturerAddress,
@@ -249,7 +253,9 @@ const createOnlyInitializeNfnodeTx = async (
         tx.feePayer = user; // set the fee payer
 
         // sign admin keypair
-        tx.partialSign(adminKeypair);
+        if (includeAdminAuthorization) {
+            tx.partialSign(adminKeypair);
+        }
 
         // serialize tx
         const serializedTx = tx.serialize({

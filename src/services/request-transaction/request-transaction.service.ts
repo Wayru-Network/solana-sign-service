@@ -995,7 +995,8 @@ export const requestTransactionToClaimDepinStakerRewards = async (
         nfnodeType: nfnodeType,
         hostAddress: hostAddress,
         manufacturerAddress: manufacturerAddress,
-        forSimulation: false // This is for real transaction
+        forSimulation: false, // This is for real transaction 
+        includeAdminAuthorization: includeAdminAuthorization,
       });
       serializedInitTx = serializedTransaction
       if (initTxError || !serializedInitTx) {
