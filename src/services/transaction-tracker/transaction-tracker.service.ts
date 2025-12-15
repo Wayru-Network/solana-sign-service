@@ -131,9 +131,7 @@ export const verifyTransactionHashFromDb = async (
 
         const document = result.rows[0];
         const expectedHash = document.expected_hash;
-        console.log('expectedHash', expectedHash);
         const txContext = document.tx_context || {};
-        console.log('txContext', txContext);
 
         if (!expectedHash) {
             return {
@@ -147,21 +145,8 @@ export const verifyTransactionHashFromDb = async (
         let transaction: Transaction;
         try {
             transaction = Transaction.from(Buffer.from(serializedTransaction, 'base64'));
-
-            // Debug: Log transaction details
-            console.log('Transaction details:', {
-                feePayer: transaction.feePayer?.toString(),
-                recentBlockhash: transaction.recentBlockhash,
-                lastValidBlockHeight: transaction.lastValidBlockHeight,
-                instructionsCount: transaction.instructions.length,
-                signaturesCount: transaction.signatures.length,
-                signatures: transaction.signatures.map(sig => ({
-                    publicKey: sig.publicKey.toString(),
-                    signature: sig.signature ? 'present' : 'null'
-                }))
-            });
         } catch (error) {
-            console.error('Error deserializing transaction:', error);
+            console.error('[verifyTransactionHashFromDb] Error deserializing transaction:', error);
             return {
                 isValid: false,
                 code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_CLAIM_REWARD_INVALID_DATA_ERROR_CODE,

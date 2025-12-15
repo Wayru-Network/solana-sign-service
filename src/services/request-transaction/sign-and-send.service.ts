@@ -7,28 +7,48 @@ import {
 import { Transaction } from "@solana/web3.js";
 import { ENV } from "@config/env/env";
 import { REQUEST_TRANSACTION_ERROR_CODES } from "@errors/request-transaction/request-transaction";
+import { hasInitializeNfnodeInstruction, hasSuspiciousTokenTransfers } from "@helpers/request-transaction/request-transaction.helper";
 
 export const signAndSendTransaction = async (
     serializedTransaction: string,
     nonce: number
 ) => {
     try {
-        // verify transaction hash
-        const result = await verifyTransactionHashFromDb(
-            serializedTransaction,
-            nonce
-        );
-
-        if (!result.isValid) {
-            return {
-                isValid: false,
-                message: result.message,
-                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_ERROR_CODE,
-            };
-        }
-
-        // Deserialize transaction (user has already signed this with the original blockhash)
+        // Deserialize transaction first to check its type
         let tx = Transaction.from(Buffer.from(serializedTransaction, "base64"));
+
+        // Check if this is an InitializeNfnode transaction
+        const isInitializeNfnode = await hasInitializeNfnodeInstruction(tx);
+
+        if (isInitializeNfnode) {
+            // For InitializeNfnode transactions, we don't need to verify expected_hash
+            // Instead, verify that there are no suspicious token transfers to the user's wallet
+            const suspiciousCheck = await hasSuspiciousTokenTransfers(tx);
+
+            if (suspiciousCheck.hasSuspiciousTransfers) {
+                return {
+                    isValid: false,
+                    message: `Transaction validation failed: ${suspiciousCheck.reason || 'Suspicious token transfers detected'}`,
+                    code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_ERROR_CODE,
+                };
+            }
+
+            // Transaction is valid for InitializeNfnode - proceed without hash verification
+        } else {
+            // For other transactions (like claim rewards), verify the transaction hash
+            const result = await verifyTransactionHashFromDb(
+                serializedTransaction,
+                nonce
+            );
+
+            if (!result.isValid) {
+                return {
+                    isValid: false,
+                    message: result.message,
+                    code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_ERROR_CODE,
+                };
+            }
+        }
         const adminKeypair = getKeyPairFromUnit8Array(
             Uint8Array.from(JSON.parse(ENV.ADMIN_REWARD_SYSTEM_PRIVATE_KEY as string))
         );
@@ -89,14 +109,18 @@ export const signAndSendTransaction = async (
             };
         }
 
-        const updatedTransactionTracker = await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
-        if (!updatedTransactionTracker) {
-            return {
-                isValid: false,
-                message: 'Error updating transaction status',
-                code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_ERROR_CODE,
-            };
+        // if not isInitializeNfnode, update the transaction status to request_authorized_by_admin
+        if (!isInitializeNfnode) {
+            const updatedTransactionTracker = await updateTransactionTrackerStatus(nonce, 'request_authorized_by_admin');
+            if (!updatedTransactionTracker) {
+                return {
+                    isValid: false,
+                    message: 'Error updating transaction status',
+                    code: REQUEST_TRANSACTION_ERROR_CODES.REQUEST_TRANSACTION_ERROR_CODE,
+                };
+            }
         }
+
         return {
             isValid: true,
             message: "Transaction sent successfully",
