@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: solana-sign-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: solana-sign-service
@@ -61,6 +61,11 @@ spec:
                 secretKeyRef:
                   name: signature-service-secrets
                   key: SOLANA_API_KEY
+            - name: SOCKETS_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: signature-service-secrets
+                  key: SOCKETS_SALT
         ports:
         - containerPort: 80
         resources:

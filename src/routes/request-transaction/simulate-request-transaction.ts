@@ -31,6 +31,9 @@ const routes: Route[] = [
     path: '/simulate-initialize-nfnode-v2',
     handler: async (ctx: CtxSimulateInitNfnode) => {
       await SimulateRequestTxController.simulateInitializeNfnodeV2(ctx);
+    },
+    config: {
+      auth: false // Set to false to make this route public (no authentication required)
     }
   },
   {
@@ -95,5 +98,8 @@ const routes: Route[] = [
 routes.forEach(route => {
   router[route.method](route.path, route.handler);
 });
+
+// Export routes array for configuration-based registration
+export { routes };
 
 export default router;
